@@ -1,0 +1,39 @@
+# ─── Compiled files ──────────────────────────────────────────────────────────
+target/
+*.class
+*.jar
+*.war
+
+# ─── Maven ───────────────────────────────────────────────────────────────────
+.mvn/
+!.mvn/wrapper/
+!.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+
+# ─── IDE ─────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.code-workspace
+.classpath
+.project
+.settings/
+
+# ─── Environment Variables (NEVER commit API keys!) ──────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Docker volumes ──────────────────────────────────────────────────────────
+docker/data/
