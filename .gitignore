@@ -40,3 +40,6 @@ docker/data/
 
 # ─── Local Migration Backup ──────────────────────────────────────────────────
 .git_backup/
+
+# Local-only documentation
+GCP_DEPLOYMENT_PLAN.md
