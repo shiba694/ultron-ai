@@ -3,7 +3,7 @@ services:
   # ─── Zookeeper (Kafka dependency) ────────────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
-    container_name: sentinel-zookeeper
+    container_name: ultron-zookeeper
     ports:
       - "2181:2181"
     environment:
@@ -18,7 +18,7 @@ services:
   # ─── Kafka Broker ────────────────────────────────────────────────────────────
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: sentinel-kafka
+    container_name: ultron-kafka
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -43,18 +43,18 @@ services:
   # ─── PostgreSQL + pgvector ───────────────────────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: sentinel-postgres
+    container_name: ultron-postgres
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: sentinel
-      POSTGRES_USER: sentinel
-      POSTGRES_PASSWORD: sentinel123
+      POSTGRES_DB: ultron
+      POSTGRES_USER: ultron
+      POSTGRES_PASSWORD: ultron123
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      test: ["CMD-SHELL", "pg_isready -U ultron -d ultron"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -62,7 +62,7 @@ services:
   # ─── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: sentinel-redis
+    container_name: ultron-redis
     ports:
       - "6379:6379"
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
@@ -75,19 +75,19 @@ services:
   # ─── Kafka UI (Web-based visualizer for Kafka) ────────────────────────────────
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: sentinel-kafka-ui
+    container_name: ultron-kafka-ui
     depends_on:
       - kafka
     ports:
       - "8090:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: sentinel-local
+      KAFKA_CLUSTERS_0_NAME: ultron-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
   # ─── Redis Commander (Web-based visualizer for Redis) ─────────────────────────
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: sentinel-redis-commander
+    container_name: ultron-redis-commander
     depends_on:
       - redis
     ports:

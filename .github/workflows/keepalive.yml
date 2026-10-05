@@ -10,10 +10,10 @@ jobs:
   keepalive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Sentinel API
+      - name: Ping Ultron API
         # --max-time 300 gives Render 5 full minutes to cold boot the container
         # --fail ensures the action fails gracefully if the API is truly down
         run: |
-          echo "Waking up Sentinel API and resetting Kafka sleep timer..."
-          curl --fail --max-time 300 -s "https://sentinel-api-tj7t.onrender.com/api/v1/health/kafka-keepalive"
+          echo "Waking up Ultron API and resetting Kafka sleep timer..."
+          curl --fail --max-time 300 -s "https://ultron-api-tj7t.onrender.com/api/v1/health/kafka-keepalive"
           echo -e "\nKeep-alive ping successful!"

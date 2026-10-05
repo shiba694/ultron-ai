@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">🛡️ Sentinel AI</h1>
+  <h1 align="center">🛡️ Ultron AI</h1>
   <p align="center">
     <strong>AI-Powered Incident Detection & Root Cause Analysis Platform</strong>
   </p>
@@ -50,7 +50,7 @@
 
 ## 🌟 Overview
 
-**Sentinel AI** is a full-stack, production-grade incident management platform that demonstrates how modern SRE (Site Reliability Engineering) teams can leverage AI to dramatically reduce Mean Time To Resolution (MTTR).
+**Ultron AI** is a full-stack, production-grade incident management platform that demonstrates how modern SRE (Site Reliability Engineering) teams can leverage AI to dramatically reduce Mean Time To Resolution (MTTR).
 
 The platform continuously monitors microservice traffic in real time, applies three independent statistical anomaly detection algorithms to identify incidents, and then uses Large Language Models (Google Gemini or Meta Llama) to automatically perform Root Cause Analysis — turning raw log noise into actionable engineering insights in seconds.
 
@@ -64,7 +64,7 @@ In a microservices architecture, when an incident occurs:
 
 ### The Solution
 
-Sentinel AI automates the entire incident lifecycle:
+Ultron AI automates the entire incident lifecycle:
 
 ```
 Log Stream → Statistical Detection → AI Root Cause Analysis → Actionable Incident
@@ -133,11 +133,11 @@ An anomaly that would take an engineer 45 minutes to manually diagnose is analyz
 
 ## 🏗 Architecture
 
-Sentinel AI follows an **event-driven microservices architecture** with clear separation of concerns:
+Ultron AI follows an **event-driven microservices architecture** with clear separation of concerns:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         SENTINEL AI PLATFORM                        │
+│                          ULTRON AI PLATFORM                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │   ┌──────────────┐    Kafka: log-events    ┌──────────────────┐     │
@@ -169,7 +169,7 @@ Sentinel AI follows an **event-driven microservices architecture** with clear se
 │                                                │ │ / Ollama  │ │    │
 │   ┌──────────────────┐                         │ └───────────┘ │    │
 │   │   REST API       │ ◄─── HTTP ───────────── │               │    │
-│   │   (sentinel-api) │                         └───────────────┘    │
+│   │   (ultron-api) │                         └───────────────┘    │
 │   └────────┬─────────┘                                              │
 │            │                                                        │
 │     ┌──────▼──────┐                                                 │
@@ -186,13 +186,13 @@ Sentinel AI follows an **event-driven microservices architecture** with clear se
 
 1. **Traffic Generation**: The `SimulationService` generates continuous normal microservice traffic (INFO/WARN logs) at a configurable rate. The `ChaosService` injects targeted anomalous patterns.
 
-2. **Ingestion**: `sentinel-ingestion` consumes from the `log-events` Kafka topic, performs high-throughput batch JDBC inserts into PostgreSQL (batch size 50), and simultaneously updates **real-time sliding window metrics** in Redis sorted sets.
+2. **Ingestion**: `ultron-ingestion` consumes from the `log-events` Kafka topic, performs high-throughput batch JDBC inserts into PostgreSQL (batch size 50), and simultaneously updates **real-time sliding window metrics** in Redis sorted sets.
 
-3. **Detection**: `sentinel-detector` runs a scheduled detection cycle every 30 seconds. For each of the 5 monitored services, it runs all three anomaly detection algorithms against the Redis metrics. Detected anomalies are published to the `anomaly-events` Kafka topic with a 5-minute deduplication window to prevent alert storms.
+3. **Detection**: `ultron-detector` runs a scheduled detection cycle every 30 seconds. For each of the 5 monitored services, it runs all three anomaly detection algorithms against the Redis metrics. Detected anomalies are published to the `anomaly-events` Kafka topic with a 5-minute deduplication window to prevent alert storms.
 
-4. **Root Cause Analysis**: `sentinel-rca` consumes anomaly events, gathers contextual log evidence from PostgreSQL, constructs a structured prompt, and queries the LLM. The AI response is parsed into a structured incident record (root cause, impact, fix, prevention) and persisted to PostgreSQL.
+4. **Root Cause Analysis**: `ultron-rca` consumes anomaly events, gathers contextual log evidence from PostgreSQL, constructs a structured prompt, and queries the LLM. The AI response is parsed into a structured incident record (root cause, impact, fix, prevention) and persisted to PostgreSQL.
 
-5. **Dashboard**: The React frontend polls the `sentinel-api` REST layer for incidents, health status, and statistics, providing a real-time operational view.
+5. **Dashboard**: The React frontend polls the `ultron-api` REST layer for incidents, health status, and statistics, providing a real-time operational view.
 
 ---
 
@@ -200,14 +200,14 @@ Sentinel AI follows an **event-driven microservices architecture** with clear se
 
 | Module | Port | Description |
 |--------|------|-------------|
-| `sentinel-common` | — | Shared DTOs (`LogEventDTO`, `AnomalyDTO`), enums (`LogLevel`, `Severity`, `AnomalyType`), and data models used across all backend services |
-| `sentinel-simulator` | 8085 | Standalone traffic generation engine (can run independently) |
-| `sentinel-ingestion` | 8082 | Kafka consumer for log events → PostgreSQL batch insert + Redis real-time metrics (p99 latency, error rate, request count) |
-| `sentinel-detector` | 8084 | Scheduled anomaly detection engine with Z-Score, Error Rate, and Moving Average analysers |
-| `sentinel-rca` | 8083 | AI-powered Root Cause Analysis — consumes anomaly events, queries LLMs, generates structured incident reports |
-| `sentinel-alert` | 8086 | Notification/alerting module (extensible for Slack, PagerDuty, email integrations) |
-| `sentinel-api` | 8080 | Central REST API — orchestrates simulation, chaos injection, incident management, health monitoring, and settings |
-| `sentinel-dashboard` | 5173 | React 19 + Vite frontend — real-time operations dashboard with incident management, health visualization, and chaos controls |
+| `ultron-common` | — | Shared DTOs (`LogEventDTO`, `AnomalyDTO`), enums (`LogLevel`, `Severity`, `AnomalyType`), and data models used across all backend services |
+| `ultron-simulator` | 8085 | Standalone traffic generation engine (can run independently) |
+| `ultron-ingestion` | 8082 | Kafka consumer for log events → PostgreSQL batch insert + Redis real-time metrics (p99 latency, error rate, request count) |
+| `ultron-detector` | 8084 | Scheduled anomaly detection engine with Z-Score, Error Rate, and Moving Average analysers |
+| `ultron-rca` | 8083 | AI-powered Root Cause Analysis — consumes anomaly events, queries LLMs, generates structured incident reports |
+| `ultron-alert` | 8086 | Notification/alerting module (extensible for Slack, PagerDuty, email integrations) |
+| `ultron-api` | 8080 | Central REST API — orchestrates simulation, chaos injection, incident management, health monitoring, and settings |
+| `ultron-dashboard` | 5173 | React 19 + Vite frontend — real-time operations dashboard with incident management, health visualization, and chaos controls |
 
 ---
 
@@ -267,8 +267,8 @@ Sentinel AI follows an **event-driven microservices architecture** with clear se
 Clone the repository and start the infrastructure services:
 
 ```bash
-git clone https://github.com/Sarajis99/sentinel-ai.git
-cd sentinel-ai
+git clone https://github.com/shiba694/ultron-ai.git
+cd ultron-ai
 
 # Start PostgreSQL, Redis, Kafka, Zookeeper, and monitoring UIs
 docker-compose up -d
@@ -299,24 +299,24 @@ Start each service (in separate terminals or your IDE):
 
 ```bash
 # Terminal 1: API Gateway (must start first)
-cd sentinel-api && mvn spring-boot:run
+cd ultron-api && mvn spring-boot:run
 
 # Terminal 2: Ingestion Pipeline
-cd sentinel-ingestion && mvn spring-boot:run
+cd ultron-ingestion && mvn spring-boot:run
 
 # Terminal 3: Anomaly Detector
-cd sentinel-detector && mvn spring-boot:run
+cd ultron-detector && mvn spring-boot:run
 
 # Terminal 4: RCA Engine
-cd sentinel-rca && mvn spring-boot:run
+cd ultron-rca && mvn spring-boot:run
 ```
 
-> **💡 Tip**: If using IntelliJ IDEA, create Run Configurations for each module. The services can be started in any order after `sentinel-api`.
+> **💡 Tip**: If using IntelliJ IDEA, create Run Configurations for each module. The services can be started in any order after `ultron-api`.
 
 ### 3. Frontend Setup
 
 ```bash
-cd sentinel-dashboard
+cd ultron-dashboard
 
 # Install dependencies
 npm install
@@ -329,7 +329,7 @@ The dashboard will be available at **http://localhost:5173**
 
 ### 4. LLM Configuration
 
-Sentinel AI supports two LLM providers:
+Ultron AI supports two LLM providers:
 
 #### Option A: OpenRouter (Recommended — Free Tier)
 
@@ -338,7 +338,7 @@ Sentinel AI supports two LLM providers:
 
    **Method 1 — Dashboard UI**: Navigate to Settings → paste your API key → Save
 
-   **Method 2 — Environment Variable**: Set `OPENROUTER_API_KEY` in the `sentinel-rca` environment:
+   **Method 2 — Environment Variable**: Set `OPENROUTER_API_KEY` in the `ultron-rca` environment:
    ```bash
    export OPENROUTER_API_KEY=sk-or-v1-your-key-here
    ```
@@ -348,7 +348,7 @@ Sentinel AI supports two LLM providers:
 1. Install [Ollama](https://ollama.com/)
 2. Pull the Llama 3 model: `ollama pull llama3`
 3. Set the environment variable: `LLM_PROVIDER=ollama`
-4. Start `sentinel-rca` — it will connect to `http://localhost:11434`
+4. Start `ultron-rca` — it will connect to `http://localhost:11434`
 
 ---
 
@@ -546,7 +546,7 @@ The operations dashboard provides a real-time view of the entire platform:
 
 | Topic | Producer | Consumer | Payload |
 |-------|----------|----------|---------|
-| `log-events` | SimulationService, ChaosService | sentinel-ingestion | `LogEventDTO` |
+| `log-events` | SimulationService, ChaosService | ultron-ingestion | `LogEventDTO` |
 | `anomaly-events` | AnomalyPublisher (detector) | AnomalyEventConsumer (RCA) | `AnomalyDTO` |
 | `rca-retry-events` | RCAService | RetryRCAConsumer | `AnomalyDTO` |
 
@@ -574,7 +574,7 @@ The operations dashboard provides a real-time view of the entire platform:
 
 ## ⚙️ Configuration Reference
 
-### Detection Thresholds (`sentinel-detector`)
+### Detection Thresholds (`ultron-detector`)
 
 ```yaml
 detection:
@@ -597,7 +597,7 @@ detection:
   moving-average-lookback-minutes: 15
 ```
 
-### LLM Configuration (`sentinel-rca`)
+### LLM Configuration (`ultron-rca`)
 
 ```yaml
 llm:
@@ -623,7 +623,7 @@ llm:
 | `OPENROUTER_API_KEY` | — | OpenRouter API key for LLM access |
 | `LLM_PROVIDER` | `openrouter` | LLM provider selection (`openrouter` or `ollama`) |
 | `OPENROUTER_MODEL` | `google/gemini-2.5-flash:free` | Default LLM model |
-| `SETTINGS_ENCRYPTION_KEY` | `sentinel-ai-default-encryption-key-32b` | AES encryption key for API key storage |
+| `SETTINGS_ENCRYPTION_KEY` | `ultron-ai-default-encryption-key-32b` | AES encryption key for API key storage |
 
 ---
 
@@ -638,9 +638,9 @@ The project uses a multi-layer testing strategy:
 mvn test
 
 # Run tests for a specific module
-mvn test -pl :sentinel-detector
-mvn test -pl :sentinel-rca
-mvn test -pl :sentinel-api
+mvn test -pl :ultron-detector
+mvn test -pl :ultron-rca
+mvn test -pl :ultron-api
 
 # Generate test coverage report
 mvn verify
@@ -650,7 +650,7 @@ mvn verify
 ### Frontend Tests
 
 ```bash
-cd sentinel-dashboard
+cd ultron-dashboard
 
 # Run all tests
 npm test
@@ -668,46 +668,46 @@ npm test -- --coverage
 ## 📂 Project Structure
 
 ```text
-sentinel-ai/
+ultron-ai/
 ├── docker/
 │   └── init.sql                     # PostgreSQL schema initialization
 ├── docker-compose.yml               # Infrastructure provisioning
 ├── pom.xml                          # Parent Maven POM (multi-module)
 │
-├── sentinel-common/                 # Shared library
+├── ultron-common/                 # Shared library
 │   └── src/main/java/.../
 │       ├── dto/                     # LogEventDTO, AnomalyDTO
 │       └── enums/                   # LogLevel, Severity, AnomalyType
 │
-├── sentinel-ingestion/              # Log ingestion pipeline
+├── ultron-ingestion/              # Log ingestion pipeline
 │   └── src/main/java/.../
 │       ├── consumer/                # KafkaLogConsumer
 │       └── service/                 # BatchInsertService, RealTimeMetricsService
 │
-├── sentinel-detector/               # Anomaly detection engine
+├── ultron-detector/               # Anomaly detection engine
 │   └── src/main/java/.../
 │       ├── config/                  # DetectionConfig (thresholds)
 │       ├── engine/                  # ZScoreAnalyser, ErrorRateAnalyser, MovingAverageAnalyser
 │       ├── model/                   # AnomalySignal
 │       └── service/                 # AnomalyDetector, AnomalyPublisher
 │
-├── sentinel-rca/                    # AI Root Cause Analysis
+├── ultron-rca/                    # AI Root Cause Analysis
 │   └── src/main/java/.../
 │       ├── consumer/                # AnomalyEventConsumer, RetryRCAConsumer
 │       ├── llm/                     # OpenRouterClient, OllamaClient, LLMClient
 │       ├── model/                   # RCAResponse
 │       └── service/                 # RCAService, ContextGatherer, PromptBuilder
 │
-├── sentinel-api/                    # REST API gateway
+├── ultron-api/                    # REST API gateway
 │   └── src/main/java/.../
 │       ├── controller/              # IncidentController, ChaosController, HealthController, ...
 │       ├── entity/                  # Incident, Anomaly, LogEvent JPA entities
 │       ├── repository/              # Spring Data JPA repositories
 │       └── service/                 # IncidentService, SimulationService, ChaosService, ...
 │
-├── sentinel-alert/                  # Alerting module (extensible)
+├── ultron-alert/                  # Alerting module (extensible)
 │
-├── sentinel-dashboard/              # React frontend
+├── ultron-dashboard/              # React frontend
 │   ├── src/
 │   │   ├── App.jsx                  # Main application component
 │   │   ├── api.js                   # API client utilities
@@ -749,5 +749,5 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 <p align="center">
   Built with ☕ Java, ⚛️ React, and 🤖 AI
   <br/>
-  <strong>Sentinel AI</strong> — Because incidents shouldn't require tribal knowledge.
+  <strong>Ultron AI</strong> — Because incidents shouldn't require tribal knowledge.
 </p>

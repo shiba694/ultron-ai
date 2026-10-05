@@ -1,5 +1,5 @@
 -- ============================================================
--- Sentinel AI — Database Initialization Script
+-- Ultron AI — Database Initialization Script
 -- ============================================================
 
 -- Enable pgvector extension for vector similarity search

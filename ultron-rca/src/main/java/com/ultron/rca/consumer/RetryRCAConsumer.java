@@ -1,0 +1,40 @@
+package com.ultron.rca.consumer;
+
+import com.ultron.rca.service.RCAService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+
+import java.util.UUID;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class RetryRCAConsumer {
+
+    private final RCAService rcaService;
+
+    @KafkaListener(
+        topics = "rca-retry-events", 
+        groupId = "ultron-rca-retry-group", 
+        containerFactory = "retryKafkaListenerContainerFactory"
+    )
+    public void consume(ConsumerRecord<String, String> record) {
+        String incidentIdStr = record.value();
+        // Remove surrounding quotes added by JsonSerializer
+        if (incidentIdStr.startsWith("\"") && incidentIdStr.endsWith("\"")) {
+            incidentIdStr = incidentIdStr.substring(1, incidentIdStr.length() - 1);
+        }
+        log.info("📥 Received retry event for incident: {}", incidentIdStr);
+        try {
+            UUID incidentId = UUID.fromString(incidentIdStr);
+            rcaService.retryRCA(incidentId);
+        } catch (IllegalArgumentException e) {
+            log.error("❌ Invalid UUID format for incident ID: {}", incidentIdStr, e);
+        } catch (Exception e) {
+            log.error("❌ Failed to process retry event for incident: {}", incidentIdStr, e);
+        }
+    }
+}
