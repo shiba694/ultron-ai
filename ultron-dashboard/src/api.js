@@ -22,7 +22,12 @@ async function fetchJSON(url, options = {}) {
 
 export async function pingAPI() {
   try {
-    const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${API_BASE}/health`, {
+      headers: {
+        'X-Ultron-Api-Key': getApiKey(),
+      },
+      signal: AbortSignal.timeout(5000),
+    });
     return res.ok;
   } catch {
     return false;

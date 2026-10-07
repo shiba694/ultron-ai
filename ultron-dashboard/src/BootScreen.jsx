@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { API_BASE, pingAPI } from './api';
+import { API_BASE, pingAPI, getApiKey } from './api';
 
 const SERVICES = [
   { id: 'api', name: 'API Gateway' },
@@ -41,6 +41,9 @@ export default function BootScreen({ onReady }) {
 
         // Try /health/services-status if available
         const res = await fetch(`${API_BASE}/health/services-status`, {
+          headers: {
+            'X-Ultron-Api-Key': getApiKey(),
+          },
           cache: 'no-store',
           signal: AbortSignal.timeout(4000),
         }).catch(() => null);
