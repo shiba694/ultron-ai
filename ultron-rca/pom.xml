@@ -66,6 +66,13 @@
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
 
+        <!-- Google Cloud Auth Library for Vertex AI Application Default Credentials -->
+        <dependency>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-oauth2-http</artifactId>
+            <version>1.24.1</version>
+        </dependency>
+
         <!-- ─── Test Dependencies ──────────────────────────────────────────── -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>

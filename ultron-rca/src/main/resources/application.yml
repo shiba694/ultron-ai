@@ -56,7 +56,14 @@ server:
 
 # ─── LLM Configuration ───────────────────────────────────────────────────────
 llm:
-  provider: ${LLM_PROVIDER:openrouter} # openrouter or ollama
+  provider: ${LLM_PROVIDER:vertex} # vertex, openrouter, or ollama
+  vertex:
+    project-id: ${GCP_PROJECT_ID:ultron-ai-cloud}
+    location: ${GCP_LOCATION:us-central1}
+    model: ${VERTEX_MODEL:gemini-1.5-flash}
+    api-key: ${GEMINI_API_KEY:}
+    timeout-seconds: 20
+
   openrouter:
     api-key: ${OPENROUTER_API_KEY:your-openrouter-key-here}
     base-url: https://openrouter.ai/api/v1

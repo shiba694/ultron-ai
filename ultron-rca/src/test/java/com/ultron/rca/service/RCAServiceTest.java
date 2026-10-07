@@ -8,6 +8,7 @@ import com.ultron.rca.entity.Incident;
 import com.ultron.rca.entity.LogEvent;
 import com.ultron.rca.llm.OllamaClient;
 import com.ultron.rca.llm.OpenRouterClient;
+import com.ultron.rca.llm.VertexAIClient;
 import com.ultron.rca.model.RCAResponse;
 import com.ultron.rca.repository.AnomalyRecordRepository;
 import com.ultron.rca.repository.IncidentRepository;
@@ -36,6 +37,8 @@ class RCAServiceTest {
     private ContextGatherer contextGatherer;
     @Mock
     private PromptBuilder promptBuilder;
+    @Mock
+    private VertexAIClient vertexAIClient;
     @Mock
     private OpenRouterClient openRouterClient;
     @Mock
@@ -171,5 +174,44 @@ class RCAServiceTest {
         rcaService.performRCA(anomaly);
 
         verify(ollamaClient).generateRCA("Prompt");
+    }
+
+    @Test
+    void testPerformRCA_SuccessWithVertexAI() throws Exception {
+        UUID anomalyId = UUID.randomUUID();
+        AnomalyDTO anomaly = AnomalyDTO.builder()
+                .anomalyId(anomalyId.toString())
+                .serviceName("order-service")
+                .anomalyType(AnomalyType.ERROR_SPIKE)
+                .metricName("error_rate")
+                .build();
+
+        Incident incident = new Incident();
+        incident.setIncidentId(UUID.randomUUID());
+
+        when(incidentRepository.existsByAnomalyId(anomalyId)).thenReturn(false);
+        when(contextGatherer.gatherRawLogs(anomaly)).thenReturn(List.of(new LogEvent()));
+        when(contextGatherer.formatLogsForPrompt(any())).thenReturn("Logs");
+        when(incidentRepository.save(any(Incident.class))).thenReturn(incident);
+        when(cacheService.buildCacheKey(any(), any(), any())).thenReturn("cacheKey");
+        when(cacheService.get("cacheKey")).thenReturn(Optional.empty());
+
+        when(promptBuilder.build(anomaly, "Logs")).thenReturn("Prompt");
+        when(rateLimiter.tryAcquire()).thenReturn(true);
+        when(vertexAIClient.isAvailable()).thenReturn(true);
+
+        RCAResponse response = RCAResponse.builder()
+                .parseSuccess(true)
+                .confidence(0.95)
+                .rootCause("DB_CONNECTION_EXHAUSTION")
+                .title("Connection Pool Saturated")
+                .build();
+        when(vertexAIClient.generateRCA("Prompt")).thenReturn(response);
+
+        rcaService.performRCA(anomaly);
+
+        verify(vertexAIClient).generateRCA("Prompt");
+        verify(openRouterClient, never()).generateRCA(anyString());
+        verify(anomalyRecordRepository).updateStatus(anomalyId, "INVESTIGATED");
     }
 }

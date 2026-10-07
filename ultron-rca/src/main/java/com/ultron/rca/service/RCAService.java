@@ -7,11 +7,13 @@ import com.ultron.rca.entity.LogEvent;
 import com.ultron.rca.llm.LLMClient;
 import com.ultron.rca.llm.OllamaClient;
 import com.ultron.rca.llm.OpenRouterClient;
+import com.ultron.rca.llm.VertexAIClient;
 import com.ultron.rca.model.RCAResponse;
 import com.ultron.rca.repository.AnomalyRecordRepository;
 import com.ultron.rca.repository.IncidentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +42,7 @@ public class RCAService {
 
     private final ContextGatherer contextGatherer;
     private final PromptBuilder promptBuilder;
+    private final VertexAIClient vertexAIClient;
     private final OpenRouterClient openRouterClient;
     private final OllamaClient ollamaClient;
     private final LLMCacheService cacheService;
@@ -47,6 +50,9 @@ public class RCAService {
     private final IncidentRepository incidentRepository;
     private final AnomalyRecordRepository anomalyRecordRepository;
     private final ObjectMapper objectMapper;
+
+    @Value("${llm.provider:vertex}")
+    private String preferredProvider;
 
     /**
      * Performs full RCA for a detected anomaly.
@@ -225,27 +231,66 @@ public class RCAService {
             return buildSkippedResponse("Rate limit exceeded and Ollama not available");
         }
 
-        // Try OpenRouter (primary)
-        LLMClient primary = openRouterClient;
-        if (primary.isAvailable()) {
-            log.info("🌐 Calling {} (primary LLM)", primary.getProviderName());
-            RCAResponse response = primary.generateRCA(prompt);
-            if (response.isParseSuccess() && response.getConfidence() > 0.0) {
-                return response;
-            }
-            log.warn("OpenRouter response was not successful — trying Ollama fallback");
+        // Determine LLM priority based on configured llm.provider
+        LLMClient primary;
+        LLMClient secondary;
+        LLMClient tertiary = ollamaClient;
+
+        if ("openrouter".equalsIgnoreCase(preferredProvider)) {
+            primary = openRouterClient;
+            secondary = vertexAIClient;
+        } else if ("ollama".equalsIgnoreCase(preferredProvider)) {
+            primary = ollamaClient;
+            secondary = vertexAIClient;
+            tertiary = openRouterClient;
         } else {
-            log.warn("OpenRouter not configured — trying Ollama fallback");
+            // Default on GCP: Vertex AI (Gemini) is primary
+            primary = vertexAIClient;
+            secondary = openRouterClient;
         }
 
-        // Try Ollama (fallback)
-        if (ollamaClient.isAvailable()) {
-            log.info("🦙 Calling {} (fallback LLM)", ollamaClient.getProviderName());
-            return ollamaClient.generateRCA(prompt);
+        // 1. Try Primary
+        if (primary.isAvailable()) {
+            log.info("🌟 Calling {} (primary LLM)", primary.getProviderName());
+            try {
+                RCAResponse response = primary.generateRCA(prompt);
+                if (response.isParseSuccess() && response.getConfidence() > 0.0) {
+                    return response;
+                }
+                log.warn("{} response was not successful — trying secondary fallback", primary.getProviderName());
+            } catch (Exception e) {
+                log.warn("{} call failed: {} — trying secondary fallback", primary.getProviderName(), e.getMessage());
+            }
+        } else {
+            log.warn("{} not available or not configured — trying secondary fallback", primary.getProviderName());
         }
 
-        log.error("❌ Both LLM providers unavailable — generating placeholder RCA");
-        return buildSkippedResponse("Both OpenRouter and Ollama are unavailable");
+        // 2. Try Secondary Fallback
+        if (secondary.isAvailable()) {
+            log.info("🔄 Calling {} (secondary LLM fallback)", secondary.getProviderName());
+            try {
+                RCAResponse response = secondary.generateRCA(prompt);
+                if (response.isParseSuccess() && response.getConfidence() > 0.0) {
+                    return response;
+                }
+                log.warn("{} response was not successful — trying tertiary fallback", secondary.getProviderName());
+            } catch (Exception e) {
+                log.warn("{} call failed: {} — trying tertiary fallback", secondary.getProviderName(), e.getMessage());
+            }
+        }
+
+        // 3. Try Tertiary Fallback (e.g. Ollama)
+        if (tertiary.isAvailable()) {
+            log.info("🦙 Calling {} (fallback LLM)", tertiary.getProviderName());
+            try {
+                return tertiary.generateRCA(prompt);
+            } catch (Exception e) {
+                log.warn("{} call failed: {}", tertiary.getProviderName(), e.getMessage());
+            }
+        }
+
+        log.error("❌ All configured LLM providers unavailable — generating placeholder RCA");
+        return buildSkippedResponse("All configured LLM providers (Vertex AI, OpenRouter, Ollama) are unavailable");
     }
 
     private Incident createInitialIncident(AnomalyDTO anomaly, com.fasterxml.jackson.databind.JsonNode logContext) {
