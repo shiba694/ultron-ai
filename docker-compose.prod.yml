@@ -215,7 +215,7 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:vertex}
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:ultron-ai-cloud}
       GCP_LOCATION: ${GCP_LOCATION:asia-south1}
-      VERTEX_MODEL: ${VERTEX_MODEL:gemini-1.5-flash}
+      VERTEX_MODEL: ${VERTEX_MODEL:-gemini-3.8-flash}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       FIRESTORE_ENABLED: ${FIRESTORE_ENABLED:-true}
