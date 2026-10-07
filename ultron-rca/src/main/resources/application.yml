@@ -58,7 +58,7 @@ server:
 llm:
   provider: ${LLM_PROVIDER:vertex} # vertex, openrouter, or ollama
   vertex:
-    project-id: ${GCP_PROJECT_ID:ultron-ai-cloud}
+    project-id: ${GCP_PROJECT_ID:project-66a019b5-7ceb-4b3f-a9f}
     location: ${GCP_LOCATION:asia-south1}
     model: ${VERTEX_MODEL:gemini-3.8-flash}
     api-key: ${GEMINI_API_KEY:}
@@ -97,7 +97,7 @@ rca:
 # ─── Firestore Dual-Write Broadcast ──────────────────────────────────────────
 firestore:
   enabled: ${FIRESTORE_ENABLED:true}
-  project-id: ${GCP_PROJECT_ID:ultron-ai-cloud}
+  project-id: ${GCP_PROJECT_ID:project-66a019b5-7ceb-4b3f-a9f}
   database-id: ${FIRESTORE_DATABASE:(default)}
   collection: incidents
 

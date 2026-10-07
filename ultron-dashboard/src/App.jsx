@@ -159,63 +159,49 @@ export default function App() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   }, []);
 
-  const loadData = useCallback(async (includeIncidents = true) => {
+  const loadData = useCallback(async () => {
     try {
-      const promises = [
+      const [incidentData, sData, hData, sim] = await Promise.all([
+        api.getIncidents(page, 50),
         api.getStats(),
         api.getHealth(),
         api.getSimulationStatus(),
-      ];
-      if (includeIncidents) {
-        promises.unshift(api.getIncidents(page, 50));
-      }
+      ]);
 
-      const results = await Promise.all(promises);
-      let loadedIncidents = null;
-      let statsData, healthData, simStatus;
+      const loadedIncidents = incidentData?.content || [];
 
-      if (includeIncidents) {
-        const [incidentData, sData, hData, sim] = results;
-        loadedIncidents = incidentData.content || [];
-        statsData = sData;
-        healthData = hData;
-        simStatus = sim;
-
-        setIncidents(prev => {
-          // If Firestore is actively streaming, merge database records while keeping live push items
-          if (firestoreActive && prev.length > 0) {
-            const map = new Map();
-            loadedIncidents.forEach(item => map.set(item.incidentId, item));
-            prev.forEach(item => {
-              const existing = map.get(item.incidentId);
-              map.set(item.incidentId, existing ? { ...existing, ...item } : item);
-            });
-            const merged = Array.from(map.values());
-            merged.sort((a, b) => new Date(b.detectedAt || b.createdAt) - new Date(a.detectedAt || a.createdAt));
-            return merged;
-          }
+      setIncidents(prev => {
+        if (!prev || prev.length === 0) {
           return loadedIncidents;
+        }
+        // Merge database records with any existing live push items
+        const map = new Map();
+        prev.forEach(item => map.set(item.incidentId, item));
+        loadedIncidents.forEach(item => {
+          const existing = map.get(item.incidentId);
+          map.set(item.incidentId, existing ? { ...existing, ...item } : item);
         });
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => new Date(b.detectedAt || b.createdAt) - new Date(a.detectedAt || a.createdAt));
+        return merged;
+      });
 
-        // Keep selected incident synchronized with the database
-        setSelected(prev => {
-          if (!prev) return null;
-          const match = loadedIncidents.find(i => i.incidentId === prev.incidentId);
-          return match ? { ...prev, ...match } : null;
-        });
-      } else {
-        [statsData, healthData, simStatus] = results;
-      }
+      // Keep selected incident synchronized with the database
+      setSelected(prev => {
+        if (!prev) return null;
+        const match = loadedIncidents.find(i => i.incidentId === prev.incidentId);
+        return match ? { ...prev, ...match } : prev;
+      });
 
-      setStats(statsData);
-      setHealth(healthData);
-      setSimRunning(simStatus.active);
+      setStats(sData);
+      setHealth(hData);
+      setSimRunning(sim?.active || false);
       setLoading(false);
     } catch (err) {
       console.error('Failed to load data:', err);
       setLoading(false);
     }
-  }, [page, firestoreActive]);
+  }, [page]);
 
   // ─── Realtime Firestore Incident Subscription ──────────────────────────
   useEffect(() => {
@@ -251,10 +237,6 @@ export default function App() {
       setFirestoreActive(false);
     });
 
-    if (unsubscribe) {
-      setFirestoreActive(true);
-    }
-
     return () => {
       if (unsubscribe) unsubscribe();
     };
@@ -279,13 +261,14 @@ export default function App() {
   }, [selected, activeTab]);
 
   useEffect(() => {
-    if (booting || isIdle) return; // Halt polling when booting or in Eco-Mode to allow ultron-api to sleep
+    if (booting || isIdle) return; // Halt polling when booting or in Eco-Mode
 
-    loadData(true);
-    // When Firestore is actively streaming, interval only polls stats & health, sparing PostgreSQL
-    const interval = setInterval(() => loadData(!firestoreActive), POLL_INTERVAL);
+    loadData();
+    // Real-time polling: 3s during active simulation, 5s during idle
+    const pollInterval = simRunning ? 3000 : 5000;
+    const interval = setInterval(loadData, pollInterval);
     return () => clearInterval(interval);
-  }, [loadData, booting, isIdle, firestoreActive]);
+  }, [loadData, booting, isIdle, simRunning]);
 
   const trendData = useMemo(() => {
     let raw = stats?.dailyTrend || [];
@@ -378,7 +361,9 @@ export default function App() {
       setInjecting(scenarioId);
       const res = await api.injectAnomaly(scenarioId, chaosTarget);
       addToast(res.message || `🚨 Injected ${scenarioId} on ${chaosTarget}`, 'success');
-      setTimeout(loadData, 3000);
+      setTimeout(loadData, 1200);
+      setTimeout(loadData, 2500);
+      setTimeout(loadData, 4500);
     } catch (err) {
       addToast(err.message, 'error');
     } finally {

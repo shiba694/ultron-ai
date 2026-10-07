@@ -217,7 +217,7 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SERVER_PORT: 8083
       LLM_PROVIDER: ${LLM_PROVIDER:-vertex}
-      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-ultron-ai-cloud}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-project-66a019b5-7ceb-4b3f-a9f}
       GCP_LOCATION: ${GCP_LOCATION:-asia-south1}
       VERTEX_MODEL: ${VERTEX_MODEL:-gemini-3.8-flash}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
