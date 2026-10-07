@@ -105,7 +105,21 @@ public class VertexAIClient implements LLMClient {
             genConfig.put("responseMimeType", "application/json");
 
             HttpEntity<String> entity = new HttpEntity<>(objectMapper.writeValueAsString(requestBody), headers);
-            ResponseEntity<String> response = restTemplate.exchange(endpointUrl, HttpMethod.POST, entity, String.class);
+            ResponseEntity<String> response;
+            try {
+                response = restTemplate.exchange(endpointUrl, HttpMethod.POST, entity, String.class);
+            } catch (org.springframework.web.client.HttpClientErrorException.NotFound notFoundEx) {
+                if (!"gemini-1.5-flash".equals(model)) {
+                    log.warn("⚠️ Model {} not found in region {}, falling back to gemini-1.5-flash", model, location);
+                    String fallbackUrl = endpointUrl.replace(model, "gemini-1.5-flash");
+                    response = restTemplate.exchange(fallbackUrl, HttpMethod.POST, entity, String.class);
+                } else {
+                    throw notFoundEx;
+                }
+            } catch (org.springframework.web.client.HttpStatusCodeException httpEx) {
+                log.error("❌ Vertex AI HTTP error: status={} body={}", httpEx.getStatusCode(), httpEx.getResponseBodyAsString());
+                throw httpEx;
+            }
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return parseGeminiResponse(response.getBody());
