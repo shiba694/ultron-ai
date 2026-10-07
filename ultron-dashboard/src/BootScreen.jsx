@@ -1,29 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { API_BASE } from './api';
-
-const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+import { API_BASE, pingAPI } from './api';
 
 const SERVICES = [
-  {
-    id: 'api',
-    name: 'API Gateway',
-    getUrl: () => `${API_BASE}/health`,
-  },
-  {
-    id: 'ingestion',
-    name: 'Log Ingestion',
-    getUrl: () => isLocal ? 'http://localhost:8081/ping' : (import.meta.env.VITE_INGESTION_URL || 'https://ultron-ingestion.onrender.com/ping'),
-  },
-  {
-    id: 'detector',
-    name: 'Anomaly Detector',
-    getUrl: () => isLocal ? 'http://localhost:8082/ping' : (import.meta.env.VITE_DETECTOR_URL || 'https://ultron-detector-c3ns.onrender.com/ping'),
-  },
-  {
-    id: 'rca',
-    name: 'RCA Engine',
-    getUrl: () => isLocal ? 'http://localhost:8083/ping' : (import.meta.env.VITE_RCA_URL || 'https://ultron-rca.onrender.com/ping'),
-  },
+  { id: 'api', name: 'API Gateway' },
+  { id: 'ingestion', name: 'Log Ingestion' },
+  { id: 'detector', name: 'Anomaly Detector' },
+  { id: 'rca', name: 'RCA Engine' },
 ];
 
 export default function BootScreen({ onReady }) {
@@ -34,67 +16,66 @@ export default function BootScreen({ onReady }) {
     rca: 'Starting...',
   });
 
-  const statusesRef = useRef(statuses);
-  statusesRef.current = statuses;
+  const onReadyCalled = useRef(false);
 
   useEffect(() => {
     let mounted = true;
-    const abortControllers = [];
 
-    // Worker function for each service that patiently pings until UP
-    const pingWorker = async (svc) => {
-      while (mounted && statusesRef.current[svc.id] !== 'UP') {
-        const controller = new AbortController();
-        abortControllers.push(controller);
-
-        // 220s timeout gives Render's free tier plenty of time to cold boot (~160-190s)
-        const timeoutId = setTimeout(() => controller.abort(), 220000);
-
-        try {
-          const res = await fetch(svc.getUrl(), {
-            method: 'GET',
-            signal: controller.signal,
-            cache: 'no-store',
+    const checkHealth = async () => {
+      try {
+        const isUp = await pingAPI();
+        if (isUp && mounted && !onReadyCalled.current) {
+          // Mark all UP and transition
+          setStatuses({
+            api: 'UP',
+            ingestion: 'UP',
+            detector: 'UP',
+            rca: 'UP',
           });
-          clearTimeout(timeoutId);
+          onReadyCalled.current = true;
+          setTimeout(() => {
+            if (mounted) onReady();
+          }, 800);
+          return;
+        }
 
-          if (res.ok) {
-            if (!mounted) return;
-            setStatuses(prev => {
-              const updated = { ...prev, [svc.id]: 'UP' };
-              statusesRef.current = updated;
+        // Try /health/services-status if available
+        const res = await fetch(`${API_BASE}/health/services-status`, {
+          cache: 'no-store',
+          signal: AbortSignal.timeout(4000),
+        }).catch(() => null);
 
-              // Check if all 4 are now UP
-              if (Object.values(updated).every(s => s === 'UP')) {
-                setTimeout(() => {
-                  if (mounted) onReady();
-                }, 1000);
-              }
-              return updated;
+        if (res && res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (mounted) {
+            setStatuses({
+              api: 'UP',
+              ingestion: data.ingestion || 'UP',
+              detector: data.detector || 'UP',
+              rca: data.rca || 'UP',
             });
-            return; // Successfully UP, terminate worker
+            onReadyCalled.current = true;
+            setTimeout(() => {
+              if (mounted) onReady();
+            }, 800);
+            return;
           }
-        } catch {
-          clearTimeout(timeoutId);
         }
-
-        // If not UP yet, pause 3 seconds before next patient attempt
-        if (mounted && statusesRef.current[svc.id] !== 'UP') {
-          await new Promise(r => setTimeout(r, 3000));
-        }
+      } catch {
+        // Continue polling
       }
     };
 
-    // Kick off all 4 service wake-up workers concurrently from the browser
-    SERVICES.forEach(svc => {
-      pingWorker(svc);
-    });
+    checkHealth();
+    const interval = setInterval(() => {
+      if (!onReadyCalled.current) {
+        checkHealth();
+      }
+    }, 3000);
 
     return () => {
       mounted = false;
-      abortControllers.forEach(c => {
-        try { c.abort(); } catch {}
-      });
+      clearInterval(interval);
     };
   }, [onReady]);
 
@@ -111,7 +92,7 @@ export default function BootScreen({ onReady }) {
       <div className="boot-logo">🛡️</div>
       <h1 className="boot-title">Ultron AI — Booting Up</h1>
       <p className="boot-subtitle">
-        Microservices are waking up from sleep mode. Because this project runs on free-tier servers, a cold boot takes <b>2 to 3 minutes</b>.
+        Connecting to the backend microservice cluster on Google Cloud Platform...
       </p>
 
       <div className="boot-services">
@@ -134,6 +115,25 @@ export default function BootScreen({ onReady }) {
           style={{ width: `${progressPercent}%` }}
         />
       </div>
+
+      <button
+        onClick={onReady}
+        style={{
+          marginTop: '28px',
+          padding: '8px 18px',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          background: 'rgba(255, 255, 255, 0.05)',
+          color: '#94a3b8',
+          fontSize: '0.8rem',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={e => { e.target.style.color = '#fff'; e.target.style.borderColor = 'rgba(255,255,255,0.3)'; }}
+        onMouseLeave={e => { e.target.style.color = '#94a3b8'; e.target.style.borderColor = 'rgba(255,255,255,0.15)'; }}
+      >
+        Skip to Dashboard &rarr;
+      </button>
     </div>
   );
 }

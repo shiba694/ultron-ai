@@ -97,6 +97,15 @@ export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
   const [booting, setBooting] = useState(true);
 
+  // Skip boot screen immediately if API gateway is already active
+  useEffect(() => {
+    if (typeof pingAPI === 'function') {
+      pingAPI().then(alive => {
+        if (alive) setBooting(false);
+      }).catch(() => {});
+    }
+  }, []);
+
   // ─── Session Heartbeat & Eco-Mode Guard ────────────────────────────────
   const { isIdle, resumeSession } = useSessionHeartbeat({
     enabled: !booting,

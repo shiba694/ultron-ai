@@ -14,7 +14,8 @@ jest.mock('./api', () => ({
     getSimConfig: jest.fn(),
     generateResolution: jest.fn(),
     testLLM: jest.fn()
-  }
+  },
+  pingAPI: jest.fn().mockResolvedValue(true)
 }));
 
 // Mock BootScreen so App unit tests test the main dashboard
