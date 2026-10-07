@@ -109,9 +109,12 @@ public class VertexAIClient implements LLMClient {
             try {
                 response = restTemplate.exchange(endpointUrl, HttpMethod.POST, entity, String.class);
             } catch (org.springframework.web.client.HttpClientErrorException.NotFound notFoundEx) {
-                if (!"gemini-1.5-flash".equals(model)) {
-                    log.warn("⚠️ Model {} not found in region {}, falling back to gemini-1.5-flash", model, location);
-                    String fallbackUrl = endpointUrl.replace(model, "gemini-1.5-flash");
+                if (!endpointUrl.contains("us-central1") || !endpointUrl.contains("gemini-1.5-flash")) {
+                    log.warn("⚠️ Model/region endpoint {} not found, falling back to us-central1 gemini-1.5-flash", endpointUrl);
+                    String fallbackUrl = String.format(
+                            "https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-1.5-flash:generateContent",
+                            projectId
+                    );
                     response = restTemplate.exchange(fallbackUrl, HttpMethod.POST, entity, String.class);
                 } else {
                     throw notFoundEx;

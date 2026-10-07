@@ -218,8 +218,8 @@ services:
       SERVER_PORT: 8083
       LLM_PROVIDER: ${LLM_PROVIDER:-vertex}
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-project-66a019b5-7ceb-4b3f-a9f}
-      GCP_LOCATION: ${GCP_LOCATION:-asia-south1}
-      VERTEX_MODEL: ${VERTEX_MODEL:-gemini-3.8-flash}
+      GCP_LOCATION: ${GCP_LOCATION:-us-central1}
+      VERTEX_MODEL: ${VERTEX_MODEL:-gemini-1.5-flash}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       FIRESTORE_ENABLED: ${FIRESTORE_ENABLED:-true}
