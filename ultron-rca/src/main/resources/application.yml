@@ -94,6 +94,13 @@ rca:
     enabled: true
     dimensions: 1536
 
+# ─── Firestore Dual-Write Broadcast ──────────────────────────────────────────
+firestore:
+  enabled: ${FIRESTORE_ENABLED:true}
+  project-id: ${GCP_PROJECT_ID:ultron-ai-cloud}
+  database-id: ${FIRESTORE_DATABASE:(default)}
+  collection: incidents
+
 logging:
   level:
     com.ultron.rca: INFO

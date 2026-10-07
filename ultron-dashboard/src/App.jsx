@@ -32,6 +32,7 @@ import './index.css';
 import { api, pingAPI } from './api';
 import BootScreen from './BootScreen';
 import { useSessionHeartbeat } from './hooks/useSessionHeartbeat';
+import { subscribeToIncidents } from './firebase';
 
 const POLL_INTERVAL = 10000;
 
@@ -119,6 +120,7 @@ export default function App() {
   const [retryingMap, setRetryingMap] = useState({});
   const [theme, setTheme] = useState(() => localStorage.getItem('ultron-theme') || 'light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [firestoreActive, setFirestoreActive] = useState(false);
 
   // Chaos panel state
   const [chaosTarget, setChaosTarget] = useState('payment-service');
@@ -148,23 +150,53 @@ export default function App() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   }, []);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (includeIncidents = true) => {
     try {
-      const [incidentData, statsData, healthData, simStatus] = await Promise.all([
-        api.getIncidents(page, 50),
+      const promises = [
         api.getStats(),
         api.getHealth(),
         api.getSimulationStatus(),
-      ]);
-      const loadedIncidents = incidentData.content || [];
-      setIncidents(loadedIncidents);
+      ];
+      if (includeIncidents) {
+        promises.unshift(api.getIncidents(page, 50));
+      }
 
-      // Keep selected incident synchronized with the database
-      setSelected(prev => {
-        if (!prev) return null;
-        const match = loadedIncidents.find(i => i.incidentId === prev.incidentId);
-        return match ? { ...prev, ...match } : null;
-      });
+      const results = await Promise.all(promises);
+      let loadedIncidents = null;
+      let statsData, healthData, simStatus;
+
+      if (includeIncidents) {
+        const [incidentData, sData, hData, sim] = results;
+        loadedIncidents = incidentData.content || [];
+        statsData = sData;
+        healthData = hData;
+        simStatus = sim;
+
+        setIncidents(prev => {
+          // If Firestore is actively streaming, merge database records while keeping live push items
+          if (firestoreActive && prev.length > 0) {
+            const map = new Map();
+            loadedIncidents.forEach(item => map.set(item.incidentId, item));
+            prev.forEach(item => {
+              const existing = map.get(item.incidentId);
+              map.set(item.incidentId, existing ? { ...existing, ...item } : item);
+            });
+            const merged = Array.from(map.values());
+            merged.sort((a, b) => new Date(b.detectedAt || b.createdAt) - new Date(a.detectedAt || a.createdAt));
+            return merged;
+          }
+          return loadedIncidents;
+        });
+
+        // Keep selected incident synchronized with the database
+        setSelected(prev => {
+          if (!prev) return null;
+          const match = loadedIncidents.find(i => i.incidentId === prev.incidentId);
+          return match ? { ...prev, ...match } : null;
+        });
+      } else {
+        [statsData, healthData, simStatus] = results;
+      }
 
       setStats(statsData);
       setHealth(healthData);
@@ -174,7 +206,50 @@ export default function App() {
       console.error('Failed to load data:', err);
       setLoading(false);
     }
-  }, [page]);
+  }, [page, firestoreActive]);
+
+  // ─── Realtime Firestore Incident Subscription ──────────────────────────
+  useEffect(() => {
+    if (booting || isIdle) return;
+
+    const unsubscribe = subscribeToIncidents((liveIncidents) => {
+      if (liveIncidents && liveIncidents.length > 0) {
+        setFirestoreActive(true);
+        setIncidents(prev => {
+          const map = new Map();
+          prev.forEach(item => map.set(item.incidentId, item));
+          liveIncidents.forEach(item => {
+            const existing = map.get(item.incidentId);
+            map.set(item.incidentId, existing ? { ...existing, ...item } : item);
+          });
+          const merged = Array.from(map.values());
+          merged.sort((a, b) => {
+            const timeA = new Date(a.detectedAt || a.createdAt).getTime();
+            const timeB = new Date(b.detectedAt || b.createdAt).getTime();
+            return timeB - timeA;
+          });
+          return merged;
+        });
+
+        setSelected(prev => {
+          if (!prev) return null;
+          const match = liveIncidents.find(i => i.incidentId === prev.incidentId);
+          return match ? { ...prev, ...match } : prev;
+        });
+        setLoading(false);
+      }
+    }, () => {
+      setFirestoreActive(false);
+    });
+
+    if (unsubscribe) {
+      setFirestoreActive(true);
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [booting, isIdle]);
 
   useEffect(() => {
     if (!selected) {
@@ -197,10 +272,11 @@ export default function App() {
   useEffect(() => {
     if (booting || isIdle) return; // Halt polling when booting or in Eco-Mode to allow ultron-api to sleep
 
-    loadData();
-    const interval = setInterval(loadData, POLL_INTERVAL);
+    loadData(true);
+    // When Firestore is actively streaming, interval only polls stats & health, sparing PostgreSQL
+    const interval = setInterval(() => loadData(!firestoreActive), POLL_INTERVAL);
     return () => clearInterval(interval);
-  }, [loadData, booting, isIdle]);
+  }, [loadData, booting, isIdle, firestoreActive]);
 
   const trendData = useMemo(() => {
     let raw = stats?.dailyTrend || [];
@@ -1350,6 +1426,30 @@ export default function App() {
           </div>
           
           <div className="top-header__actions">
+            {firestoreActive && (
+              <span className="firestore-live-badge" title="Real-time incident updates streaming from Google Cloud Firestore via WebSockets" style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '20px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                background: 'rgba(245, 158, 11, 0.12)',
+                color: '#f59e0b',
+                border: '1px solid rgba(245, 158, 11, 0.3)'
+              }}>
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#f59e0b',
+                  boxShadow: '0 0 6px #f59e0b',
+                  display: 'inline-block'
+                }} />
+                🔥 Firestore Live
+              </span>
+            )}
             <button
               className={`mobile-sim-btn ${simRunning ? 'running' : ''}`}
               onClick={simRunning ? handleStopSimulation : handleSimulate}

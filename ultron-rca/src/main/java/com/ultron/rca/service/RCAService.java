@@ -50,6 +50,7 @@ public class RCAService {
     private final IncidentRepository incidentRepository;
     private final AnomalyRecordRepository anomalyRecordRepository;
     private final ObjectMapper objectMapper;
+    private final FirestoreSyncService firestoreSyncService;
 
     @Value("${llm.provider:vertex}")
     private String preferredProvider;
@@ -123,6 +124,7 @@ public class RCAService {
 
             // Phase 3: After AI completes
             updateIncidentWithRCA(incident, rcaResponse);
+            firestoreSyncService.syncIncidentAsync(incident, rcaResponse);
             log.info("✅ Incident saved: id={} rootCause={} confidence={}",
                     incident.getIncidentId(), rcaResponse.getRootCause(), rcaResponse.getConfidence());
 
@@ -182,6 +184,7 @@ public class RCAService {
                 log.warn("⚠️ No logs found for anomaly {} window, skipping LLM analysis", anomaly.getAnomalyId());
                 RCAResponse rcaResponse = buildSkippedResponse("No logs found in the DB for the anomaly time window. The incident may be too old or logs were not ingested.");
                 updateIncidentWithRCA(incident, rcaResponse);
+                firestoreSyncService.syncIncidentAsync(incident, rcaResponse);
                 return incident;
             }
             String logContextForPrompt = contextGatherer.formatLogsForPrompt(rawLogs);
@@ -190,6 +193,7 @@ public class RCAService {
             RCAResponse rcaResponse = callLLMWithFallback(prompt);
 
             updateIncidentWithRCA(incident, rcaResponse);
+            firestoreSyncService.syncIncidentAsync(incident, rcaResponse);
             return incident;
         } catch (Exception e) {
             log.error("❌ Retry RCA failed for incident={}: {}", incidentId, e.getMessage(), e);

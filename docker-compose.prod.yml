@@ -218,6 +218,8 @@ services:
       VERTEX_MODEL: ${VERTEX_MODEL:gemini-1.5-flash}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      FIRESTORE_ENABLED: ${FIRESTORE_ENABLED:-true}
+      FIRESTORE_DATABASE: ${FIRESTORE_DATABASE:-(default)}
     deploy:
       resources:
         limits:

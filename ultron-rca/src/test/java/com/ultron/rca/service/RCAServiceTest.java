@@ -53,6 +53,8 @@ class RCAServiceTest {
     private AnomalyRecordRepository anomalyRecordRepository;
     @Mock
     private ObjectMapper objectMapper;
+    @Mock
+    private FirestoreSyncService firestoreSyncService;
 
     @InjectMocks
     private RCAService rcaService;
