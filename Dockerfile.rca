@@ -1,20 +1,30 @@
 # Build Stage
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 WORKDIR /app
+
+# Copy all POMs for dependency caching
 COPY pom.xml .
 COPY ultron-common/pom.xml ultron-common/
 COPY ultron-simulator/pom.xml ultron-simulator/
 COPY ultron-ingestion/pom.xml ultron-ingestion/
 COPY ultron-detector/pom.xml ultron-detector/
 COPY ultron-rca/pom.xml ultron-rca/
+COPY ultron-alert/pom.xml ultron-alert/
 COPY ultron-api/pom.xml ultron-api/
+
+# Copy source code and build
 COPY . .
 RUN mvn clean package -DskipTests -pl ultron-common,ultron-rca -am
 
 # Run Stage
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
+
+# Copy the built jar
 COPY --from=build /app/ultron-rca/target/ultron-rca-*.jar app.jar
-COPY --from=build /app/ultron-common/src/main/resources/ca.pem /app/ca.pem
-EXPOSE 8080
-ENTRYPOINT ["java", "-Xmx300m", "-jar", "app.jar", "--spring.profiles.active=prod", "--spring.kafka.properties.ssl.truststore.location=/app/ca.pem"]
+
+# Expose the RCA Engine port
+EXPOSE 8083
+
+# Run with standard entrypoint (heap configured via JAVA_TOOL_OPTIONS in docker-compose.prod.yml)
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -1,0 +1,39 @@
+# Git & CI/CD
+.git
+.github
+.git_backup
+
+# IDEs
+.idea
+.vscode
+*.iml
+*.iws
+*.ipr
+
+# Maven build artifacts (build stage inside Docker compiles from clean source)
+**/target/
+target/
+
+# Frontend dependencies and builds
+**/node_modules/
+node_modules/
+**/dist/
+dist/
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Logs and volumes
+*.log
+logs/
+docker/data/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
