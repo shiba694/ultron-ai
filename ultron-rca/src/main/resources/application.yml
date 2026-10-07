@@ -59,7 +59,7 @@ llm:
   provider: ${LLM_PROVIDER:vertex} # vertex, openrouter, or ollama
   vertex:
     project-id: ${GCP_PROJECT_ID:ultron-ai-cloud}
-    location: ${GCP_LOCATION:us-central1}
+    location: ${GCP_LOCATION:asia-south1}
     model: ${VERTEX_MODEL:gemini-1.5-flash}
     api-key: ${GEMINI_API_KEY:}
     timeout-seconds: 20
