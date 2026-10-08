@@ -32,7 +32,7 @@ import './index.css';
 import { api, pingAPI } from './api';
 import BootScreen from './BootScreen';
 import { useSessionHeartbeat } from './hooks/useSessionHeartbeat';
-import { subscribeToIncidents } from './firebase';
+import { subscribeToIncidents, clearFirestoreIncidents } from './firebase';
 
 const POLL_INTERVAL = 10000;
 
@@ -171,16 +171,26 @@ export default function App() {
       const loadedIncidents = incidentData?.content || [];
 
       setIncidents(prev => {
-        if (!prev || prev.length === 0) {
-          return loadedIncidents;
+        if (!loadedIncidents || loadedIncidents.length === 0) {
+          return [];
         }
-        // Merge database records with any existing live push items
         const map = new Map();
-        prev.forEach(item => map.set(item.incidentId, item));
-        loadedIncidents.forEach(item => {
-          const existing = map.get(item.incidentId);
-          map.set(item.incidentId, existing ? { ...existing, ...item } : item);
+        loadedIncidents.forEach(item => map.set(item.incidentId, item));
+
+        // Retain live updates for loaded items or very recent in-flight items (< 20s)
+        const recentThreshold = Date.now() - 20000;
+        (prev || []).forEach(item => {
+          if (map.has(item.incidentId)) {
+            const dbItem = map.get(item.incidentId);
+            map.set(item.incidentId, { ...dbItem, ...item });
+          } else {
+            const itemTime = new Date(item.detectedAt || item.createdAt).getTime();
+            if (itemTime > recentThreshold) {
+              map.set(item.incidentId, item);
+            }
+          }
         });
+
         const merged = Array.from(map.values());
         merged.sort((a, b) => new Date(b.detectedAt || b.createdAt) - new Date(a.detectedAt || a.createdAt));
         return merged;
@@ -212,10 +222,16 @@ export default function App() {
         setFirestoreActive(true);
         setIncidents(prev => {
           const map = new Map();
-          prev.forEach(item => map.set(item.incidentId, item));
+          (prev || []).forEach(item => map.set(item.incidentId, item));
+
+          // Accept live Firestore items if they update an existing incident, or are recent (< 30m)
+          const recentThreshold = Date.now() - (30 * 60 * 1000);
           liveIncidents.forEach(item => {
-            const existing = map.get(item.incidentId);
-            map.set(item.incidentId, existing ? { ...existing, ...item } : item);
+            const itemTime = new Date(item.detectedAt || item.createdAt).getTime();
+            if (map.has(item.incidentId) || itemTime > recentThreshold || prev.length === 0) {
+              const existing = map.get(item.incidentId);
+              map.set(item.incidentId, existing ? { ...existing, ...item } : item);
+            }
           });
           const merged = Array.from(map.values());
           merged.sort((a, b) => {
@@ -434,6 +450,7 @@ export default function App() {
     try {
       setResetting(true);
       await api.factoryReset();
+      await clearFirestoreIncidents();
       addToast('🗑️ All data cleared successfully!', 'success');
       setShowResetConfirm(false);
       setSelected(null);

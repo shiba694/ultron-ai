@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, query, limit, getDocs, deleteDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -97,3 +97,23 @@ export function subscribeToIncidents(onUpdate, onError) {
     return null;
   }
 }
+
+/**
+ * Purges all incident documents in Google Cloud Firestore.
+ * Used during factory resets to keep cloud storage synchronized with PostgreSQL.
+ */
+export async function clearFirestoreIncidents() {
+  if (!isFirestoreAvailable()) {
+    return;
+  }
+  try {
+    const incidentsCol = collection(db, 'incidents');
+    const snapshot = await getDocs(incidentsCol);
+    const deletePromises = snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+    await Promise.all(deletePromises);
+    console.info(`🔥 [Firestore] Successfully cleared ${snapshot.size} incidents from Firestore`);
+  } catch (err) {
+    console.warn('⚠️ [Firestore] Failed to clear incidents from Firestore:', err.message);
+  }
+}
+
