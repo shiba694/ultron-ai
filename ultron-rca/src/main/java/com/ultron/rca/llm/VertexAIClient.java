@@ -71,10 +71,10 @@ public class VertexAIClient implements LLMClient {
                         model, apiKey.trim()
                 );
             } else {
-                // Vertex AI enterprise mode using Google Cloud IAM (ADC)
+                // Agent Platform / Vertex AI enterprise mode using Google Cloud IAM (ADC)
                 endpointUrl = String.format(
-                        "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
-                        location, projectId, location, model
+                        "https://aiplatform.googleapis.com/v1/projects/%s/locations/global/publishers/google/models/%s:generateContent",
+                        projectId.trim(), model
                 );
                 String token = getOAuth2Token();
                 if (token == null || token.isBlank()) {
@@ -82,6 +82,7 @@ public class VertexAIClient implements LLMClient {
                     return buildFallbackResponse("GCP credentials not found for Vertex AI");
                 }
                 headers.setBearerAuth(token);
+                headers.set("X-Goog-User-Project", projectId.trim());
             }
 
             // Build request payload matching Vertex AI / Gemini schema
@@ -109,15 +110,20 @@ public class VertexAIClient implements LLMClient {
             try {
                 response = restTemplate.exchange(endpointUrl, HttpMethod.POST, entity, String.class);
             } catch (org.springframework.web.client.HttpClientErrorException.NotFound notFoundEx) {
-                if (!endpointUrl.contains("us-central1") || !endpointUrl.contains("gemini-1.5-flash")) {
-                    log.warn("⚠️ Model/region endpoint {} not found, falling back to us-central1 gemini-1.5-flash", endpointUrl);
-                    String fallbackUrl = String.format(
-                            "https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-1.5-flash:generateContent",
-                            projectId
-                    );
+                log.warn("⚠️ Primary endpoint {} not found, trying us-central1 gemini-1.5-flash fallback", endpointUrl);
+                String fallbackUrl = String.format(
+                        "https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-1.5-flash:generateContent",
+                        projectId.trim()
+                );
+                try {
                     response = restTemplate.exchange(fallbackUrl, HttpMethod.POST, entity, String.class);
-                } else {
-                    throw notFoundEx;
+                } catch (org.springframework.web.client.HttpClientErrorException.NotFound notFoundEx2) {
+                    log.warn("⚠️ us-central1 fallback also returned 404, trying global gemini-3.8-flash");
+                    String global38Url = String.format(
+                            "https://aiplatform.googleapis.com/v1/projects/%s/locations/global/publishers/google/models/gemini-3.8-flash:generateContent",
+                            projectId.trim()
+                    );
+                    response = restTemplate.exchange(global38Url, HttpMethod.POST, entity, String.class);
                 }
             } catch (org.springframework.web.client.HttpStatusCodeException httpEx) {
                 log.error("❌ Vertex AI HTTP error: status={} body={}", httpEx.getStatusCode(), httpEx.getResponseBodyAsString());
