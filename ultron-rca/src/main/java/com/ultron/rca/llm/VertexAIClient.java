@@ -38,7 +38,7 @@ public class VertexAIClient implements LLMClient {
     @Value("${llm.vertex.location:us-central1}")
     private String location;
 
-    @Value("${llm.vertex.model:gemini-3.8-flash}")
+    @Value("${llm.vertex.model:gemini-1.5-flash}")
     private String model;
 
     @Value("${llm.vertex.api-key:}")
