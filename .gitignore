@@ -45,6 +45,8 @@ docker/data/
 
 # Local-only documentation
 GCP_DEPLOYMENT_PLAN.md
+doccs/
+presentation/
 
 # Firebase CLI cache
 .firebase/
