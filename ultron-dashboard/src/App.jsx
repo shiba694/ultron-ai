@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  BarChart2, 
-  AlertCircle, 
-  Settings, 
-  Activity, 
-  Server, 
+import {
+  BarChart2,
+  AlertCircle,
+  Settings,
+  Activity,
+  Server,
   Database,
   CheckCircle2,
   XCircle,
@@ -17,24 +17,40 @@ import {
   ChevronLeft,
   Sun,
   Moon,
-  Edit3
+  Edit3,
+  ArrowUpRight,
+  FlaskConical,
+  Zap,
+  Timer,
+  Unplug,
+  Droplets,
+  Link2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Cloud,
+  ScanLine
 } from 'lucide-react';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
 } from 'recharts';
 import './index.css';
+import BrandMark from './components/BrandMark';
+import OverviewHero from './components/OverviewHero';
+import IncidentOverview from './components/IncidentOverview';
+import { hasAIAnalysis, hasManualAnalysis, showAIAnalysis } from './components/incidentStates';
+import IncidentWorkflow from './components/IncidentWorkflow';
 import { api, pingAPI } from './api';
 import BootScreen from './BootScreen';
 import { useSessionHeartbeat } from './hooks/useSessionHeartbeat';
 import { subscribeToIncidents, clearFirestoreIncidents } from './firebase';
 
-const POLL_INTERVAL = 10000;
+
 
 function parseLocalDate(dateStr) {
   if (!dateStr) return null;
@@ -112,7 +128,7 @@ export default function App() {
     onResume: () => setBooting(true),
   });
   const [incidents, setIncidents] = useState([]);
-  const [page, setPage] = useState(0);
+  const [page] = useState(0);
   const [selected, setSelected] = useState(null);
   const [activeTab, setActiveTab] = useState('details');
   const [stats, setStats] = useState(null);
@@ -127,9 +143,14 @@ export default function App() {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [retryingMap, setRetryingMap] = useState({});
-  const [theme, setTheme] = useState(() => localStorage.getItem('ultron-theme') || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('ultron-theme') || 'dark');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [firestoreActive, setFirestoreActive] = useState(false);
+  const [incidentSearch, setIncidentSearch] = useState('');
+  const visibleIncidents = useMemo(() => {
+    const search = incidentSearch.trim().toLowerCase();
+    return incidents.filter(incident => !search || [incident.incidentNumber, incident.title, incident.serviceName, incident.severity, incident.status].some(value => value?.toLowerCase().includes(search)));
+  }, [incidents, incidentSearch]);
 
   // Chaos panel state
   const [chaosTarget, setChaosTarget] = useState('payment-service');
@@ -177,12 +198,12 @@ export default function App() {
         const map = new Map();
         loadedIncidents.forEach(item => map.set(item.incidentId, item));
 
-        // Retain live updates for loaded items or very recent in-flight items (< 20s)
+        // Poll results refresh loaded records; retain very recent in-flight items (< 20s).
         const recentThreshold = Date.now() - 20000;
         (prev || []).forEach(item => {
           if (map.has(item.incidentId)) {
             const dbItem = map.get(item.incidentId);
-            map.set(item.incidentId, { ...dbItem, ...item });
+            map.set(item.incidentId, { ...item, ...dbItem });
           } else {
             const itemTime = new Date(item.detectedAt || item.createdAt).getTime();
             if (itemTime > recentThreshold) {
@@ -266,8 +287,8 @@ export default function App() {
 
   useEffect(() => {
     if (!selected) return;
-    const hasAi = selected.confidence != null || selected.status === 'AWAITING_TRIAGE';
-    const hasManual = selected.manualRootCause || (selected.confidence == null && ['RCA_COMPLETE', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(selected.status));
+    const hasAi = showAIAnalysis(selected);
+    const hasManual = hasManualAnalysis(selected);
 
     if (activeTab === 'analysis' && !hasAi && hasManual) {
       setActiveTab('manual');
@@ -290,13 +311,13 @@ export default function App() {
     let raw = stats?.dailyTrend || [];
     const result = [];
     const today = new Date();
-    
+
     // Create an array of the last 7 days (including today)
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
-      
+
       // Look for this date in the raw data
       const existing = raw.find(item => item.date === dateStr);
       result.push({
@@ -304,7 +325,7 @@ export default function App() {
         incidents: existing ? Number(existing.incidents) : 0
       });
     }
-    
+
     return result;
   }, [stats?.dailyTrend]);
 
@@ -342,8 +363,8 @@ export default function App() {
     setShowModal(true);
   };
 
-  const handleOpenNewModal = handleOpenManualModal;
-  const handleOpenEditModal = handleOpenManualModal;
+
+
 
   // ─── Action Handlers ──────────────────────────────────────────────────
   const handleSimulate = async () => {
@@ -526,18 +547,18 @@ export default function App() {
       setRetryingMap(prev => ({ ...prev, [id]: true }));
       await api.retryAnalysis(id);
       addToast('AI analysis retry started...', 'info');
-      
+
       // Optimistically update UI if currently viewing this incident
       setSelected(prev => (prev && prev.incidentId === id ? { ...prev, status: 'ASSESSING' } : prev));
 
       let attempts = 0;
       let wasAssessing = false;
-      
+
       const pollInterval = setInterval(async () => {
         attempts++;
         try {
           const updated = await api.getIncident(id);
-          
+
           if (updated.status === 'ASSESSING') {
             wasAssessing = true;
             setSelected(prev => (prev && prev.incidentId === id ? updated : prev));
@@ -550,14 +571,14 @@ export default function App() {
               delete next[id];
               return next;
             });
-            
+
             if (updated.status === 'RCA_COMPLETE') {
               addToast('AI analysis complete!', 'success');
             } else if (updated.status === 'AWAITING_TRIAGE') {
               addToast('AI analysis failed again.', 'error');
             }
           }
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
       }, 2000);
     } catch (err) {
       addToast(err.message, 'error');
@@ -601,6 +622,7 @@ export default function App() {
   // ─── Sub-Components ───────────────────────────────────────────────────
   const renderDashboardView = () => (
     <>
+      <OverviewHero running={simRunning} onViewIncidents={() => setCurrentView('incidents')} />
       <div className="metrics-grid">
         <div className="metric-card">
           <div className="metric-card__header">
@@ -610,20 +632,20 @@ export default function App() {
           <div className="metric-card__value">{stats?.totalIncidents ?? '—'}</div>
           <div className="metric-card__sub">{stats?.totalAnomalies ?? 0} anomalies detected</div>
         </div>
-        <div className="metric-card" style={{borderTop: '3px solid var(--severity-p1)'}}>
+        <div className="metric-card">
           <div className="metric-card__header">
             <span className="metric-card__label">Active Incidents</span>
             <ShieldAlert className="metric-card__icon" size={16} color="var(--severity-p1)" />
           </div>
-          <div className="metric-card__value" style={{color: 'var(--severity-p1)'}}>{stats ? (stats.awaitingTriageCount + stats.inProgressCount) : '—'}</div>
+          <div className="metric-card__value" style={{color: 'var(--severity-p1)'}}>{stats ? Math.max(0, (stats.totalIncidents ?? 0) - (stats.resolvedIncidents ?? 0) - (stats.closedCount ?? 0)) : '—'}</div>
           <div className="metric-card__sub">{stats?.awaitingTriageCount ?? 0} awaiting triage</div>
         </div>
-        <div className="metric-card" style={{borderTop: '3px solid var(--accent-emerald)'}}>
+        <div className="metric-card">
           <div className="metric-card__header">
-            <span className="metric-card__label">Resolved</span>
+            <span className="metric-card__label">Completed</span>
             <CheckCircle2 className="metric-card__icon" size={16} color="var(--accent-emerald)" />
           </div>
-          <div className="metric-card__value" style={{color: 'var(--accent-emerald)'}}>{stats ? (stats.resolvedIncidents + stats.closedCount) : '—'}</div>
+          <div className="metric-card__value" style={{color: 'var(--accent-emerald)'}}>{stats ? ((stats.resolvedIncidents ?? 0) + (stats.closedCount ?? 0)) : '—'}</div>
           <div className="metric-card__sub">Avg MTTR: {formatMTTR(stats?.averageMttrSeconds)}</div>
         </div>
         <div className="metric-card">
@@ -632,23 +654,76 @@ export default function App() {
             <Database className="metric-card__icon" size={16} />
           </div>
           <div className="metric-card__value">{stats?.totalLogEvents?.toLocaleString() ?? '—'}</div>
-          <div className="metric-card__sub">Processed in last 24h</div>
+          <div className="metric-card__sub">Events in the evidence store</div>
+        </div>
+      </div>
+
+      <div className="dashboard-grid">
+        {/* Trend Graph */}
+        <div className="dashboard-panel">
+          <div className="panel-header">
+            <span className="panel-title"><BarChart2 size={16} /> Incident activity</span><span className="panel-caption">Last 7 days</span>
+          </div>
+          <div className="trend-summary"><strong>{trendData.reduce((total, day) => total + day.incidents, 0)}</strong><span>incidents detected in this period</span></div>
+          <div className="panel-content" style={{height: '250px', minHeight: '250px'}}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" />
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '10px' }}
+                  itemStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
+                />
+                <Area type="monotone" dataKey="incidents" stroke="var(--accent-primary)" strokeWidth={2.5} dot={false} activeDot={{ r: 5, strokeWidth: 3, stroke: 'var(--bg-card)' }} fillOpacity={1} fill="url(#colorEvents)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Health Grid */}
+        <div className="dashboard-panel">
+          <div className="panel-header">
+            <span className="panel-title"><Server size={16} /> Service health</span><span className="panel-caption">{Object.keys(health?.services || {}).length} reporting</span>
+          </div>
+          <div className="panel-content">
+            <div className="health-grid">
+              {['payment-service', 'order-service', 'inventory-service', 'notification-service', 'user-service'].map(svc => {
+                const sHealth = health?.services?.[svc];
+                const status = sHealth?.status || 'UNKNOWN';
+                return (
+                  <div className="health-item" key={svc}>
+                    <span className="health-item__name"><span className="service-icon"><Server size={15} /></span> {svc.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+                    <div className="health-item__metrics">
+                      {sHealth && <span className="health-item__numbers">{Math.round(sHealth.errorRate * 100)}% err | p99: {Math.round(sHealth.p99Latency || 0)}ms</span>}
+                      <span className={`health-indicator ${status.toLowerCase()}`}>{status.toLowerCase()}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* ─── Chaos Engineering Panel ───────────────────────────────── */}
       <div className="chaos-panel">
         <div className="chaos-panel__header">
-          <span className="chaos-panel__title">🔥 Chaos Engineering Lab</span>
+          <div><span className="chaos-panel__title"><FlaskConical size={17} /> Chaos Engineering Lab</span><p className="chaos-panel__subtitle">Introduce a failure. Watch the intelligence respond.</p></div>
           <div className="chaos-panel__controls">
-            <label style={{fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600}}>Target:</label>
-            <select className="chaos-panel__service-select" value={chaosTarget} onChange={e => setChaosTarget(e.target.value)}>
+            <label htmlFor="chaos-target" style={{fontSize: 'var(--text-label)', color: 'var(--text-secondary)', fontWeight: 600}}>Target:</label>
+            <select id="chaos-target" className="chaos-panel__service-select" value={chaosTarget} onChange={e => setChaosTarget(e.target.value)}>
               {chaosServices.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         </div>
-        {simRunning ? (
-          <div className="chaos-grid">
+        <div className="chaos-grid">
             {(chaosScenarios.length > 0 ? chaosScenarios : [
               { id: 'ERROR_SPIKE', label: 'Error Spike', icon: '⚡' },
               { id: 'LATENCY_SURGE', label: 'Latency Surge', icon: '🐢' },
@@ -662,95 +737,39 @@ export default function App() {
                 key={s.id}
                 className="chaos-btn"
                 onClick={() => handleInjectAnomaly(s.id)}
-                disabled={injecting === s.id}
+                disabled={!simRunning || injecting === s.id}
+                title={!simRunning ? 'Start simulation to enable this scenario' : s.label}
               >
-                <span className="chaos-btn__icon">{s.icon}</span>
+                <span className="chaos-btn__icon">{(() => { const ScenarioIcon = ({ ERROR_SPIKE: Zap, LATENCY_SURGE: Timer, DB_OUTAGE: Unplug, MEMORY_LEAK: Droplets, DOWNSTREAM_FAILURE: Link2, RATE_LIMIT_SPIKE: ShieldCheck, CONFIG_ERROR: SlidersHorizontal })[s.id] || Zap; return <ScenarioIcon size={18} strokeWidth={1.5} />; })()}</span>
                 {injecting === s.id ? 'Injecting...' : s.label}
               </button>
             ))}
           </div>
-        ) : (
-          <div className="chaos-panel__disabled-msg">
-            ⚠️ Start the simulation engine to unlock anomaly injection
-          </div>
-        )}
+        {!simRunning && <div className="chaos-panel__disabled-msg"><Play size={12} /> Start the simulation engine to unlock anomaly injection.</div>}
       </div>
 
-      <div className="dashboard-grid">
-        {/* Trend Graph */}
-        <div className="dashboard-panel">
-          <div className="panel-header">
-            <span className="panel-title"><BarChart2 size={16} /> Anomaly Detection Trend (Last 7 Days)</span>
-          </div>
-          <div className="panel-content" style={{height: '300px'}}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '4px' }}
-                  itemStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
-                />
-                <Area type="monotone" dataKey="incidents" stroke="var(--accent-primary)" strokeWidth={2} fillOpacity={1} fill="url(#colorEvents)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Health Grid */}
-        <div className="dashboard-panel">
-          <div className="panel-header">
-            <span className="panel-title"><Server size={16} /> System Health Overview</span>
-          </div>
-          <div className="panel-content">
-            <div className="health-grid">
-              {['payment-service', 'order-service', 'inventory-service', 'notification-service', 'user-service'].map(svc => {
-                const sHealth = health?.services?.[svc];
-                const status = sHealth?.status || 'UNKNOWN';
-                return (
-                  <div className="health-item" key={svc}>
-                    <span className="health-item__name"><Server size={14} /> {svc.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      {sHealth && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{Math.round(sHealth.errorRate * 100)}% err | p99: {Math.round(sHealth.p99Latency || 0)}ms</span>}
-                      <span className={`health-indicator ${status.toLowerCase()}`}>{status}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activity Feed */}
+      {/* Latest investigations */}
       <div className="dashboard-panel" style={{marginBottom: 0}}>
         <div className="panel-header">
-          <span className="panel-title"><Clock size={16} /> Recent Activity Feed</span>
-          <button className="btn" onClick={() => setCurrentView('incidents')} style={{padding: '4px 8px', fontSize: '0.75rem'}}>View All Incidents</button>
+          <span className="panel-title"><Clock size={16} /> Latest investigations</span>
+          <button className="btn" onClick={() => setCurrentView('incidents')} >View all <ArrowUpRight size={13} /></button>
         </div>
         <div className="panel-content no-pad">
           {incidents.slice(0, 5).map(inc => (
-            <div key={inc.incidentId} className="feed-item" onClick={() => { setCurrentView('incidents'); handleSelectIncident(inc); }}>
+            <button type="button" key={inc.incidentId} className="feed-item" onClick={() => { setCurrentView('incidents'); handleSelectIncident(inc); }}>
               <div className="feed-item__header">
                 <span className="feed-item__title">
-                  <span className="incident-number-inline">{inc.incidentNumber || 'INC-NEW'}</span> 
+                  <span className="incident-number-inline">{inc.incidentNumber || 'INC-NEW'}</span>
                   {inc.title || 'Untitled Incident'}
                 </span>
                 <span className={`badge badge-${inc.severity?.toLowerCase()}`}>{inc.severity}</span>
               </div>
               <div className="feed-item__meta">
-                <span className={`badge badge-${inc.status?.toLowerCase()?.replace('_', '-')}`}>{inc.status}</span>
+                <span className={`badge badge-${inc.status?.toLowerCase()?.replace('_', '-')}`}>{({ RCA_COMPLETE: 'Analyzed', AWAITING_TRIAGE: 'Needs triage', IN_PROGRESS: 'In progress', ASSESSING: 'Assessing', NEW: 'New', RESOLVED: 'Resolved', CLOSED: 'Closed' })[inc.status] || inc.status}</span>
                 <span className={getServiceClass(inc.serviceName)}>{inc.serviceName}</span>
                 <span className="feed-item__time">{formatDate(inc.detectedAt)}</span>
               </div>
-            </div>
+            </button>
           ))}
           {incidents.length === 0 && <div className="empty-state" style={{padding: '24px'}}>No recent activity.</div>}
         </div>
@@ -759,23 +778,27 @@ export default function App() {
   );
 
   const renderIncidentsView = () => (
+    <>
+    <div className="page-intro"><div className="eyebrow">FROM DETECTION TO RESOLUTION</div><h2>Investigate with clarity.</h2><p>Review the evidence, compare analyses, and move every incident forward.</p></div>
     <div className="incident-view">
       {/* Left: Incident List */}
       <div className={`incident-list-panel ${selected ? 'mobile-hide' : ''}`}>
         <div className="panel-header">
-          <span className="panel-title">Active Queue</span>
-          <span className="badge" style={{background: 'var(--bg-primary)'}}>{incidents.length} loaded</span>
+          <span className="panel-title">Incident queue</span>
+          <span className="badge" style={{background: 'var(--bg-primary)'}}>{visibleIncidents.length} / {incidents.length}</span>
         </div>
+        <div className="queue-search"><Search size={15} /><input aria-label="Search incidents" placeholder="Search incidents or services…" value={incidentSearch} onChange={e => setIncidentSearch(e.target.value)} />{incidentSearch && <button aria-label="Clear search" onClick={() => setIncidentSearch('')}><XCircle size={14} /></button>}</div>
         <div className="feed-list">
+          {!loading && incidents.length > 0 && visibleIncidents.length === 0 && <div className="empty-state">No incidents match your search.</div>}
           {loading && <div className="empty-state"><div className="spinner" />Loading...</div>}
           {!loading && incidents.length === 0 && (
             <div className="empty-state">
-              <div className="empty-state__icon">🔍</div>
+              <div className="empty-state__icon"><Search /></div>
               <div>No incidents in queue.</div>
             </div>
           )}
-          {incidents.map(inc => (
-            <div
+          {visibleIncidents.map(inc => (
+            <button type="button"
               key={inc.incidentId}
               className={`feed-item ${selected?.incidentId === inc.incidentId ? 'active' : ''} ${inc.rootCause === 'UNKNOWN' ? 'unknown' : ''}`}
               onClick={() => handleSelectIncident(inc)}
@@ -788,11 +811,11 @@ export default function App() {
                 <span className={`badge badge-${inc.severity?.toLowerCase()}`}>{inc.severity}</span>
               </div>
               <div className="feed-item__meta">
-                <span className={`badge badge-${inc.status?.toLowerCase()?.replace('_', '-')}`}>{inc.status}</span>
+                <span className={`badge badge-${inc.status?.toLowerCase()?.replace('_', '-')}`}>{({ RCA_COMPLETE: 'Analyzed', AWAITING_TRIAGE: 'Needs triage', IN_PROGRESS: 'In progress', ASSESSING: 'Assessing', NEW: 'New', RESOLVED: 'Resolved', CLOSED: 'Closed' })[inc.status] || inc.status}</span>
                 <span className={getServiceClass(inc.serviceName)}>{inc.serviceName}</span>
                 <span className="feed-item__time">{formatTime(inc.detectedAt)}</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -800,10 +823,7 @@ export default function App() {
       {/* Right: Detail Panel */}
       <div className={`incident-detail-panel ${!selected ? 'mobile-hide' : ''}`}>
         {!selected ? (
-          <div className="empty-state">
-            <div className="empty-state__icon">📋</div>
-            <div>{incidents.length === 0 ? 'No incidents active. System is running healthy.' : 'Select an incident from the queue to view RCA details.'}</div>
-          </div>
+          <div className="empty-state investigation-empty"><div className="empty-state__icon"><ScanLine /></div><h3>Your next insight starts here.</h3><p>{incidents.length === 0 ? 'Start a simulation to explore detection and analysis.' : 'Choose an incident to connect the evidence, understand its root cause, and plan your next move.'}</p><span className="eyebrow">EVIDENCE. ANALYSIS. ACTION.</span></div>
         ) : (
           <div className="detail-panel" style={{padding: 0}}>
             <div className="detail-header">
@@ -816,7 +836,7 @@ export default function App() {
                   <h2 className="detail-header__title">{selected.title}</h2>
                 </div>
               </div>
-              
+
               <div className="action-bar">
                 {(selected.status === 'NEW' || selected.status === 'ASSESSING') && (
                   <span className="ai-processing-indicator">
@@ -825,9 +845,9 @@ export default function App() {
                 )}
                 {selected.status === 'AWAITING_TRIAGE' && (
                   <>
-                    <button 
-                      className="btn btn-primary" 
-                      onClick={() => handleRetryAnalysis(selected.incidentId)} 
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => handleRetryAnalysis(selected.incidentId)}
                       disabled={!!retryingMap[selected.incidentId]}
                     >
                       {retryingMap[selected.incidentId] ? (
@@ -838,6 +858,9 @@ export default function App() {
                     </button>
                     <button className="btn btn-warning" onClick={handleOpenManualModal}>
                       <ShieldAlert size={14} /> Manual Triage
+                    </button>
+                    <button className="btn btn-success" onClick={() => handleAccept(selected.incidentId)} disabled={!!retryingMap[selected.incidentId]}>
+                      <CheckCircle2 size={14} /> Accept & Work
                     </button>
                     <button className="btn" onClick={() => handleDismiss(selected.incidentId)}>
                       <XCircle size={14} /> Dismiss
@@ -888,23 +911,25 @@ export default function App() {
               </div>
             </div>
 
+            <IncidentWorkflow incident={selected} />
+
             {/* Top Level Tabs */}
             <div className="tabs">
               <button className={`tab ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>
                 Incident Details
               </button>
 
-              {/* Show AI Analysis tab if incident was analyzed by AI, OR if currently awaiting triage */}
-              {(selected.confidence != null || selected.status === 'AWAITING_TRIAGE') && (
+              {/* Keep unavailable AI analysis explicit after accepting without a report. */}
+              {showAIAnalysis(selected) && (
                 <button className={`tab ${activeTab === 'analysis' ? 'active' : ''}`} onClick={() => setActiveTab('analysis')}>
-                  ✨ AI Analysis
+                  AI Analysis
                 </button>
               )}
 
               {/* Show Manual Analysis tab if manual analysis was performed */}
-              {(selected.manualRootCause || (selected.confidence == null && ['RCA_COMPLETE', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(selected.status))) && (
+              {hasManualAnalysis(selected) && (
                 <button className={`tab ${activeTab === 'manual' ? 'active' : ''}`} onClick={() => setActiveTab('manual')}>
-                  🧠 Manual Analysis
+                  Manual Analysis
                 </button>
               )}
 
@@ -917,164 +942,21 @@ export default function App() {
             <div className="detail-content">
               {activeTab === 'details' && (
                 <>
-                  {selected.status === 'AWAITING_TRIAGE' && (
-                    <div className="ai-status-banner warning">
-                      ⚠️ AI analysis was unavailable for this incident. Use "Retry AI Analysis" or submit a manual triage report.
-                    </div>
-                  )}
-                  <div className="sn-form-container">
-                  {/* ServiceNow Header */}
-                  <div className="sn-header-bar">
-                    <div className="sn-header-left">
-                      <button className="sn-icon-btn-borderless"><ChevronLeft size={18} /></button>
-                      <button className="sn-icon-btn-borderless"><Menu size={18} /></button>
-                      <span className="sn-header-title">Incident {selected.incidentNumber || 'INC-NEW'}</span>
-                    </div>
-                  </div>
-
-                  {/* Process Flow Formatter (Stepper) */}
-                  <div className="sn-process-flow">
-                    {['NEW', 'ASSESSING', 'RCA_COMPLETE', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map((step, idx) => {
-                      const statusOrder = ['NEW', 'ASSESSING', 'RCA_COMPLETE', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
-                      const currentIdx = selected.status === 'AWAITING_TRIAGE' ? 2 : statusOrder.indexOf(selected.status);
-                      const stepLabels = { NEW: 'New', ASSESSING: 'Assess', RCA_COMPLETE: 'Root Cause Analysis', IN_PROGRESS: 'Fix in Progress', RESOLVED: 'Resolved', CLOSED: 'Closed' };
-                      
-                      let stepClass = '';
-                      if (step === 'RCA_COMPLETE' && selected.status === 'AWAITING_TRIAGE') {
-                        stepClass = 'warning';
-                      } else if (idx < currentIdx) {
-                        stepClass = 'completed';
-                      } else if (idx === currentIdx) {
-                        stepClass = 'active';
-                      }
-                      
-                      return (
-                        <div key={step} className={`sn-flow-step ${stepClass}`}>
-                          {stepClass === 'completed' && <span className="step-check">✓ </span>}
-                          {stepLabels[step]}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Form Content */}
-                  <div className="sn-form-body">
-                    <div className="sn-form-grid">
-                      {/* Left Column */}
-                      <div className="sn-form-col">
-                        <div className="sn-form-group">
-                          <label className="sn-label">Number</label>
-                          <input type="text" className="sn-input sn-readonly" value={selected.incidentNumber || 'INC-NEW'} readOnly />
-                        </div>
-                        <div className="sn-form-group">
-                          <label className="sn-label">Caller</label>
-                          <div className="sn-input-group">
-                            <input type="text" className="sn-input" value="Ultron Detector" readOnly />
-                            <button className="sn-icon-btn"><Search size={14} /></button>
-                          </div>
-                        </div>
-                        <div className="sn-form-group">
-                          <label className="sn-label">Category</label>
-                          <select className="sn-input" defaultValue="Software">
-                            <option>Software</option>
-                            <option>Hardware</option>
-                            <option>Network</option>
-                          </select>
-                        </div>
-                        <div className="sn-form-group">
-                          <label className="sn-label">Subcategory</label>
-                          <select className="sn-input" defaultValue="Microservice">
-                            <option>Microservice</option>
-                            <option>Database</option>
-                            <option>Internal</option>
-                          </select>
-                        </div>
-                        <div className="sn-form-group">
-                          <label className="sn-label">Configuration item</label>
-                          <div className="sn-input-group">
-                            <input type="text" className="sn-input" value={selected.serviceName} readOnly />
-                            <button className="sn-icon-btn"><Search size={14} /></button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right Column */}
-                      <div className="sn-form-col">
-                        <div className="sn-form-group">
-                          <label className="sn-label">State</label>
-                          <select className="sn-input" value={selected.status} readOnly disabled>
-                            <option value="NEW">New</option>
-                            <option value="ASSESSING">Assessing</option>
-                            <option value="RCA_COMPLETE">RCA Complete</option>
-                            <option value="AWAITING_TRIAGE">Awaiting Triage</option>
-                            <option value="IN_PROGRESS">In Progress</option>
-                            <option value="RESOLVED">Resolved</option>
-                            <option value="CLOSED">Closed</option>
-                          </select>
-                        </div>
-                        <div className="sn-form-group">
-                          <label className="sn-label">Impact</label>
-                          <select className="sn-input" defaultValue={['P0', 'P1'].includes(selected.severity) ? '1 - High' : selected.severity === 'P2' ? '2 - Medium' : '3 - Low'}>
-                            <option>1 - High</option>
-                            <option>2 - Medium</option>
-                            <option>3 - Low</option>
-                          </select>
-                        </div>
-                        <div className="sn-form-group">
-                          <label className="sn-label">Urgency</label>
-                          <select className="sn-input" defaultValue={['P0', 'P1'].includes(selected.severity) ? '1 - High' : selected.severity === 'P2' ? '2 - Medium' : '3 - Low'}>
-                            <option>1 - High</option>
-                            <option>2 - Medium</option>
-                            <option>3 - Low</option>
-                          </select>
-                        </div>
-                        <div className="sn-form-group">
-                          <label className="sn-label">Priority</label>
-                          <input type="text" className="sn-input sn-readonly" value={selected.severity === 'P0' ? '1 - Critical' : selected.severity === 'P1' ? '2 - High' : selected.severity === 'P2' ? '3 - Moderate' : '4 - Low'} readOnly />
-                        </div>
-                        <div className="sn-form-group">
-                          <label className="sn-label">Assignment group</label>
-                          <div className="sn-input-group">
-                            <input type="text" className="sn-input" value="Ultron AI Triage" readOnly />
-                            <button className="sn-icon-btn"><Search size={14} /></button>
-                          </div>
-                        </div>
-                        <div className="sn-form-group">
-                          <label className="sn-label">Assigned to</label>
-                          <div className="sn-input-group">
-                            <input type="text" className="sn-input" value="Auto-Remediation Bot" readOnly />
-                            <button className="sn-icon-btn"><Search size={14} /></button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Full Width Fields */}
-                    <div className="sn-form-full">
-                      <div className="sn-form-group">
-                        <label className="sn-label required">Short description</label>
-                        <input type="text" className="sn-input" value={selected.title} readOnly />
-                      </div>
-                      <div className="sn-form-group">
-                        <label className="sn-label">Description</label>
-                        <textarea className="sn-textarea" readOnly value={`Source Anomaly ID: ${selected.anomalyId}\nDetected At: ${formatDate(selected.detectedAt)}\nAnalyzed At: ${formatDate(selected.analyzedAt)}\n\nAutomated Incident created by Ultron AI. This incident was generated due to an anomaly in ${selected.serviceName}.`} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  <IncidentOverview incident={selected} formatDate={formatDate} formatMTTR={formatMTTR} />
 
                 {/* Work Notes Section */}
                 {!['NEW', 'ASSESSING'].includes(selected.status) && (
                   <div className="work-notes-section">
                     <div className="work-notes-header">
-                      <span className="work-notes-title">💬 Work Notes</span>
-                      <span className="work-notes-count">{comments.length} notes</span>
+                      <span className="work-notes-title">Work Notes</span>
+                      <span className="work-notes-count">{comments.length} {comments.length === 1 ? 'note' : 'notes'}</span>
                     </div>
-                    
+
                     {selected.status !== 'CLOSED' && (
                       <div className="work-notes-input-area">
                         <textarea
                           className="work-notes-textarea"
+                          aria-label="Work note"
                           placeholder="Add a work note..."
                           value={newComment}
                           onChange={(e) => setNewComment(e.target.value)}
@@ -1085,7 +967,7 @@ export default function App() {
                         </button>
                       </div>
                     )}
-                    
+
                     <div className="work-notes-list">
                       {comments.length === 0 && (
                         <div className="work-notes-empty">No work notes yet. Add one to document your investigation.</div>
@@ -1107,9 +989,9 @@ export default function App() {
 
               {activeTab === 'analysis' && (
                 <div className="rca-grid" style={{marginTop: '16px'}}>
-                  {selected.status === 'AWAITING_TRIAGE' ? (
+                  {!hasAIAnalysis(selected) ? (
                     <div style={{padding: '24px', textAlign: 'center', color: 'var(--text-secondary)'}}>
-                      ⚠️ AI analysis was unavailable for this incident. You can retry AI analysis or perform manual triage using the buttons above.
+                      ⚠️ AI analysis is unavailable for this incident. {selected.status === 'AWAITING_TRIAGE' ? 'Retry AI analysis, add manual triage, or Accept & Work to investigate without an AI report.' : 'Work can continue without an AI report. Add manual triage to document your findings.'}
                     </div>
                   ) : (
                     <>
@@ -1142,7 +1024,7 @@ export default function App() {
                               style={{ width: `${(selected.confidence ?? 0) * 100}%` }}
                             />
                           </div>
-                          <div style={{fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600}}>
+                          <div style={{fontSize: 'var(--text-meta)', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600}}>
                             {((selected.confidence ?? 0) * 100).toFixed(0)}% CONFIDENCE
                           </div>
                         </div>
@@ -1155,16 +1037,16 @@ export default function App() {
               {activeTab === 'manual' && (
                 <div className="rca-grid" style={{marginTop: '16px'}}>
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--border-subtle)'}}>
-                    <span className="badge badge-rca-complete" style={{fontSize: '0.8rem', padding: '4px 10px'}}>
+                    <span className="badge badge-rca-complete" style={{fontSize: 'var(--text-label)', padding: '4px 10px'}}>
                       🧠 Human Expert Analysis
                     </span>
                     <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
                       {selected.manualTriagedAt && (
-                        <span style={{fontSize: '0.75rem', color: 'var(--text-muted)'}}>
+                        <span style={{fontSize: 'var(--text-label)', color: 'var(--text-muted)'}}>
                           Triaged: {formatDate(selected.manualTriagedAt)}
                         </span>
                       )}
-                      <button className="btn" onClick={handleOpenManualModal} style={{padding: '3px 8px', fontSize: '0.75rem'}}>
+                      <button className="btn" onClick={handleOpenManualModal} style={{padding: '3px 8px', fontSize: 'var(--text-label)'}}>
                         <Edit3 size={12} /> Edit
                       </button>
                     </div>
@@ -1204,21 +1086,21 @@ export default function App() {
                         return parsed.map((log, idx) => {
                           if (typeof log === 'string') {
                             return (
-                              <div key={idx} style={{marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0'}}>
+                              <div key={idx} style={{marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--border-subtle)'}}>
                                 <span>{log}</span>
                               </div>
                             );
                           }
                           const logTime = log.timestamp || log.time;
                           return (
-                            <div key={idx} style={{marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0'}}>
-                              <span style={{color: '#64748b', marginRight: '8px'}}>[{logTime ? formatDate(logTime) : '—'}]</span>
-                              <span style={{color: log.level === 'ERROR' ? '#ef4444' : log.level === 'WARN' ? '#f59e0b' : '#3b82f6', fontWeight: 600}}>{log.level || 'INFO'}</span>
+                            <div key={idx} style={{marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--border-subtle)'}}>
+                              <span style={{color: 'var(--text-muted)', marginRight: '8px'}}>[{logTime ? formatDate(logTime) : '—'}]</span>
+                              <span style={{color: (log.logLevel || log.level) === 'ERROR' ? 'var(--severity-p0)' : (log.logLevel || log.level) === 'WARN' ? 'var(--severity-p1)' : 'var(--accent-cyan)', fontWeight: 600}}>{log.logLevel || log.level || 'INFO'}</span>
                               <span style={{marginLeft: '8px'}}>{log.message || JSON.stringify(log)}</span>
                             </div>
                           );
                         });
-                      } catch (e) {
+                      } catch {
                         return selected.relatedLogs;
                       }
                     })()}
@@ -1229,10 +1111,13 @@ export default function App() {
         )}
       </div>
     </div>
+    </>
   );
 
   // ─── Settings View ──────────────────────────────────────────────────────
   const renderSettingsView = () => (
+    <>
+    <div className="page-intro"><div className="eyebrow">YOUR COMMAND CENTER, CONFIGURED</div><h2>Fine-tune the intelligence.</h2><p>Manage your AI connection and shape the telemetry behind your investigations.</p></div>
     <div className="settings-view">
       {/* Section 1: AI & API Configuration */}
       <div className="settings-card">
@@ -1242,7 +1127,7 @@ export default function App() {
         </div>
         <div className="settings-card__body">
           <div className="settings-field">
-            <span className="settings-field__label">OpenRouter API Key</span>
+            <label className="settings-field__label" htmlFor="openrouter-key">OpenRouter API Key</label>
             {apiKeyMasked && (
               <span className="settings-badge success" style={{alignSelf: 'flex-start', marginBottom: '4px'}}>
                 🔒 Current: {apiKeyMasked}
@@ -1250,6 +1135,7 @@ export default function App() {
             )}
             <div className="settings-field__row">
               <input
+                id="openrouter-key"
                 type="password"
                 className="settings-input"
                 placeholder="sk-or-v1-..."
@@ -1286,10 +1172,11 @@ export default function App() {
         </div>
         <div className="settings-card__body">
           <div className="settings-field">
-            <span className="settings-field__label">Log Ingestion Rate</span>
+            <label className="settings-field__label" htmlFor="log-ingestion-rate">Log Ingestion Rate</label>
             <div className="settings-slider-container">
-              <span style={{fontSize: '0.75rem', color: 'var(--text-muted)'}}>1/s</span>
+              <span style={{fontSize: 'var(--text-label)', color: 'var(--text-muted)'}}>1/s</span>
               <input
+                id="log-ingestion-rate"
                 type="range"
                 className="settings-slider"
                 min="1"
@@ -1297,7 +1184,7 @@ export default function App() {
                 value={logsPerSecond}
                 onChange={e => handleUpdateLogsPerSecond(parseInt(e.target.value))}
               />
-              <span style={{fontSize: '0.75rem', color: 'var(--text-muted)'}}>20/s</span>
+              <span style={{fontSize: 'var(--text-label)', color: 'var(--text-muted)'}}>20/s</span>
               <span className="settings-slider__value">{logsPerSecond} logs/s</span>
             </div>
             <span className="settings-field__hint">
@@ -1306,6 +1193,8 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      <aside className="settings-note"><ShieldCheck size={20} strokeWidth={1.4} /><div><h3>Built for deliberate experiments.</h3><p>Start with a modest event rate, introduce one scenario at a time, then follow its evidence through the incident lifecycle.</p></div></aside>
 
       {/* Section 3: Danger Zone */}
       <div className="settings-card danger-zone">
@@ -1316,7 +1205,7 @@ export default function App() {
         <div className="settings-card__body">
           <div className="settings-field">
             <span className="settings-field__label">Factory Reset</span>
-            <span className="settings-field__hint" style={{marginBottom: '8px'}}>
+            <span className="settings-field__hint">
               This will permanently delete ALL incidents, logs, anomalies, and cached data. Kafka offsets will not be reset. This action cannot be undone.
             </span>
             {!showResetConfirm ? (
@@ -1325,7 +1214,7 @@ export default function App() {
               </button>
             ) : (
               <div className="settings-field__row">
-                <span style={{fontSize: '0.82rem', fontWeight: 600, color: 'var(--severity-p0)'}}>
+                <span style={{fontSize: 'var(--text-label)', fontWeight: 600, color: 'var(--severity-p0)'}}>
                   Are you sure? This cannot be undone.
                 </span>
                 <button className="btn-danger" onClick={handleFactoryReset} disabled={resetting} style={{whiteSpace: 'nowrap'}}>
@@ -1340,6 +1229,7 @@ export default function App() {
         </div>
       </div>
     </div>
+    </>
   );
 
   // ─── Main Render ──────────────────────────────────────────────────────
@@ -1363,40 +1253,44 @@ export default function App() {
       </div>
 
       {/* ─── Global Sidebar (Left) ────────────────────────────────────── */}
-      <div 
+      <div
         className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`}
         onClick={() => setIsSidebarOpen(false)}
       ></div>
       <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar__brand">
-          <ShieldAlert className="sidebar__logo-icon" size={28} />
+          <BrandMark />
           <div className="sidebar__logo-text">
             <div className="sidebar__logo">Ultron AI</div>
-            <div className="sidebar__subtitle">Command Center</div>
+            <div className="sidebar__subtitle">Detect. Decide. Resolve.</div>
           </div>
         </div>
-        
-        <nav className="sidebar__nav">
-          <div 
+
+        <nav className="sidebar__nav" aria-label="Main navigation"><span className="nav-section-label">WORKSPACE</span>
+          <button type="button"
+            aria-current={currentView === 'dashboard' ? 'page' : undefined}
             className={`nav-item ${currentView === 'dashboard' ? 'active' : ''}`}
             onClick={() => { setCurrentView('dashboard'); setIsSidebarOpen(false); }}
           >
             <BarChart2 className="icon" /> Dashboard
-          </div>
-          <div 
+          </button>
+          <button type="button"
+            aria-current={currentView === 'incidents' ? 'page' : undefined}
             className={`nav-item ${currentView === 'incidents' ? 'active' : ''}`}
             onClick={() => { setCurrentView('incidents'); setIsSidebarOpen(false); }}
           >
             <AlertCircle className="icon" /> Incidents
-          </div>
-          <div 
+          </button>
+          <button type="button"
+            aria-current={currentView === 'settings' ? 'page' : undefined}
             className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
             onClick={() => { setCurrentView('settings'); setIsSidebarOpen(false); }}
           >
             <Settings className="icon" /> Settings
-          </div>
+          </button>
         </nav>
 
+        <div className="sidebar__context"><div className="sidebar__context-label"><Cloud size={15} /> Cloud workspace</div><p>Telemetry to intelligence.<br />Powered by Google Cloud.</p></div>
         <div className="sidebar__footer">
           {simRunning ? (
             <button
@@ -1415,52 +1309,31 @@ export default function App() {
               <Play size={16} fill="currentColor" /> Start Simulation
             </button>
           )}
+          <div className="sidebar__footer-caption">On-demand telemetry simulation</div>
         </div>
       </aside>
 
       {/* ─── Main Workspace (Right) ────────────────────────────────────── */}
       <main className="workspace">
-        
+
         {/* Top Header */}
         <header className="top-header">
           <div className="top-header__left">
-            <button 
-              className="mobile-menu-btn" 
+            <button
+              className="mobile-menu-btn"
               onClick={() => setIsSidebarOpen(true)}
               aria-label="Open Menu"
             >
               <Menu size={24} />
             </button>
+            <div className="top-header__breadcrumb">Workspace <span>/</span></div>
             <h1 className="top-header__title">
-              {currentView === 'dashboard' ? 'Global Overview' : currentView === 'settings' ? 'Settings' : 'Incident Management'}
+              {currentView === 'dashboard' ? 'Overview' : currentView === 'settings' ? 'Settings' : 'Incidents'}
             </h1>
           </div>
-          
+
           <div className="top-header__actions">
-            {firestoreActive && (
-              <span className="firestore-live-badge" title="Real-time incident updates streaming from Google Cloud Firestore via WebSockets" style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 10px',
-                borderRadius: '20px',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                background: 'rgba(245, 158, 11, 0.12)',
-                color: '#f59e0b',
-                border: '1px solid rgba(245, 158, 11, 0.3)'
-              }}>
-                <span style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: '#f59e0b',
-                  boxShadow: '0 0 6px #f59e0b',
-                  display: 'inline-block'
-                }} />
-                🔥 Firestore Live
-              </span>
-            )}
+            <span className={`stream-status ${firestoreActive ? 'live' : ''}`} title={firestoreActive ? 'Incident updates connected through Firestore' : 'Dashboard uses periodic API updates'}><span className="status-dot" /><span>{firestoreActive ? 'Firestore live' : 'API updates'}</span></span>
             <button
               className={`mobile-sim-btn ${simRunning ? 'running' : ''}`}
               onClick={simRunning ? handleStopSimulation : handleSimulate}
@@ -1472,14 +1345,14 @@ export default function App() {
                 <><Play size={12} fill="currentColor" /> Sim</>
               )}
             </button>
-            <button className="theme-toggle" onClick={toggleTheme} title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}>
+            <button className="theme-toggle" aria-label={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'} onClick={toggleTheme} title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}>
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
           </div>
         </header>
 
         {/* Scrollable Content Area */}
-        <div className="content-area">
+        <div className="content-area" key={currentView}>
           {currentView === 'dashboard' && renderDashboardView()}
           {currentView === 'incidents' && renderIncidentsView()}
           {currentView === 'settings' && renderSettingsView()}

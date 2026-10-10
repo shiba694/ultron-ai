@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { CheckCircle2, LoaderCircle } from 'lucide-react';
+import BrandMark from './components/BrandMark';
 import { API_BASE, pingAPI, getApiKey } from './api';
 
 const SERVICES = [
@@ -92,8 +94,8 @@ export default function BootScreen({ onReady }) {
 
   return (
     <div className="boot-screen">
-      <div className="boot-logo">🛡️</div>
-      <h1 className="boot-title">Ultron AI — Booting Up</h1>
+      <BrandMark className="boot-logo" />
+      <h1 className="boot-title">Intelligence is coming online.</h1>
       <p className="boot-subtitle">
         Connecting to the backend microservice cluster on Google Cloud Platform...
       </p>
@@ -102,7 +104,7 @@ export default function BootScreen({ onReady }) {
         {serviceList.map(s => (
           <div key={s.name} className={`boot-service ${s.status === 'UP' ? 'ready' : ''}`}>
             <div className={`boot-service-icon ${s.status === 'UP' ? '' : 'spinning'}`}>
-              {s.status === 'UP' ? '✅' : '⏳'}
+              {s.status === 'UP' ? <CheckCircle2 size={18} /> : <LoaderCircle size={18} />}
             </div>
             <div className="boot-service-name">{s.name}</div>
             <div className={`boot-service-status ${s.status === 'UP' ? 'up' : 'starting'}`}>
@@ -119,22 +121,7 @@ export default function BootScreen({ onReady }) {
         />
       </div>
 
-      <button
-        onClick={onReady}
-        style={{
-          marginTop: '28px',
-          padding: '8px 18px',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          background: 'rgba(255, 255, 255, 0.05)',
-          color: '#94a3b8',
-          fontSize: '0.8rem',
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={e => { e.target.style.color = '#fff'; e.target.style.borderColor = 'rgba(255,255,255,0.3)'; }}
-        onMouseLeave={e => { e.target.style.color = '#94a3b8'; e.target.style.borderColor = 'rgba(255,255,255,0.15)'; }}
-      >
+      <button className="btn" onClick={onReady}>
         Skip to Dashboard &rarr;
       </button>
     </div>

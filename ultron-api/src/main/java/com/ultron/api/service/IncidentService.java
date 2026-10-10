@@ -186,12 +186,12 @@ public class IncidentService {
                 .build();
     }
 
-    /** Accept & begin work: RCA_COMPLETE → IN_PROGRESS */
+    /** Accept & begin work after analysis or when an analyst proceeds without AI. */
     @Transactional
     public IncidentDTO acceptIncident(UUID incidentId) {
         Incident incident = findIncident(incidentId);
-        if (!"RCA_COMPLETE".equals(incident.getStatus())) {
-            throw new IllegalStateException("Can only accept incidents with status RCA_COMPLETE. Current: " + incident.getStatus());
+        if (!"RCA_COMPLETE".equals(incident.getStatus()) && !"AWAITING_TRIAGE".equals(incident.getStatus())) {
+            throw new IllegalStateException("Can only accept incidents with status RCA_COMPLETE or AWAITING_TRIAGE. Current: " + incident.getStatus());
         }
         incident.setStatus("IN_PROGRESS");
         incidentRepository.save(incident);

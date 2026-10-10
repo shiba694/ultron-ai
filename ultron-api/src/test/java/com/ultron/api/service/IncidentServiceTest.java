@@ -175,6 +175,34 @@ class IncidentServiceTest {
     }
 
     @Test
+    void acceptIncident_AwaitingTriageWithoutAnalysis() {
+        incident.setStatus("AWAITING_TRIAGE");
+        when(incidentRepository.findByIncidentId(incidentId)).thenReturn(Optional.of(incident));
+
+        IncidentDTO result = incidentService.acceptIncident(incidentId);
+
+        assertEquals("IN_PROGRESS", result.getStatus());
+        assertNull(result.getConfidence());
+        assertNull(result.getRootCause());
+        assertNull(result.getAnalyzedAt());
+        assertNull(result.getResolvedAt());
+        assertNull(result.getMttrSeconds());
+        verify(incidentRepository).save(incident);
+        verifyNoInteractions(kafkaTemplate);
+    }
+
+    @Test
+    void acceptIncident_RejectsOtherStages() {
+        when(incidentRepository.findByIncidentId(incidentId)).thenReturn(Optional.of(incident));
+        for (String status : List.of("NEW", "ASSESSING", "IN_PROGRESS", "RESOLVED", "CLOSED")) {
+            incident.setStatus(status);
+            assertThrows(IllegalStateException.class, () -> incidentService.acceptIncident(incidentId), status);
+            assertEquals(status, incident.getStatus());
+        }
+        verify(incidentRepository, never()).save(any());
+    }
+
+    @Test
     void closeIncident() {
         incident.setStatus("RESOLVED");
         when(incidentRepository.findByIncidentId(incidentId)).thenReturn(Optional.of(incident));
