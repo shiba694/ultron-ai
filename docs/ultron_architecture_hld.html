@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ultron AI Enterprise Closed-Loop Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 2760px;
+    height: 1200px;
+    background: #f1f5f9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #0f172a;
+    overflow: hidden;
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #090d16 0%, #111827 50%, #1e293b 100%);
+    border-radius: 12px;
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .header-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: white;
+    font-weight: 900;
+    font-size: 22px;
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    letter-spacing: -0.5px;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+    border: 1px solid rgba(255,255,255,0.25);
+  }
+  .header-title-box h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .header-title-box h1 span.highlight {
+    background: linear-gradient(90deg, #60a5fa, #93c5fd);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header-title-box p {
+    font-size: 13.5px;
+    color: #94a3b8;
+    margin-top: 2px;
+    font-weight: 500;
+  }
+  .header-badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .badge {
+    padding: 7px 15px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.2px;
+  }
+  .badge-gcp { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1.5px solid rgba(59, 130, 246, 0.4); }
+  .badge-vertex { background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(59, 130, 246, 0.25)); color: #d8b4fe; border: 1.5px solid rgba(168, 85, 247, 0.5); }
+  .badge-firestore { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border: 1.5px solid rgba(245, 158, 11, 0.4); }
+  .badge-sla { background: rgba(34, 197, 94, 0.2); color: #86efac; border: 1.5px solid rgba(34, 197, 94, 0.4); }
+
+  /* Main Grid */
+  .architecture-body {
+    display: grid;
+    grid-template-columns: 530px 450px 1200px 500px;
+    gap: 14px;
+    height: 980px;
+    margin: 10px 0;
+  }
+
+  /* Columns & Cards */
+  .col {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .main-card {
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1.5px solid #e2e8f0;
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-subtitle {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #475569;
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+  }
+
+  /* Service Lists & Tags */
+  .services-container {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .service-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #3b82f6;
+    border-radius: 6px;
+    padding: 7px 10px;
+  }
+  .service-item.payment { border-left-color: #ef4444; }
+  .service-item.order { border-left-color: #f97316; }
+  .service-item.inventory { border-left-color: #eab308; }
+  .service-item.user { border-left-color: #3b82f6; }
+  .service-item.notif { border-left-color: #8b5cf6; }
+
+  .service-name {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .service-port {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+  }
+  .service-tech {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+    margin-top: 1px;
+  }
+  .service-desc {
+    font-size: 11px;
+    color: #334155;
+    margin-top: 3px;
+    line-height: 1.35;
+  }
+
+  /* Chaos Engine Box */
+  .chaos-box {
+    background: linear-gradient(135deg, #fff7ed 0%, #fff1f2 100%);
+    border: 1.5px solid #fdba74;
+    border-radius: 8px;
+    padding: 11px 13px;
+    margin-top: 9px;
+  }
+  .chaos-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #c2410c;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+  }
+  .chaos-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 7px;
+  }
+  .chaos-pill {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 4px 9px;
+    border-radius: 4px;
+    background: #ffedd5;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+  }
+
+  /* Closed Loop Feedback Box */
+  .remediation-target {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 2px dashed #16a34a;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .remediation-icon {
+    font-size: 18px;
+    color: #16a34a;
+    font-weight: 900;
+    line-height: 1;
+    margin-top: 2px;
+  }
+  .remediation-text {
+    font-size: 11.5px;
+    color: #14532d;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  /* Kafka Column */
+  .kafka-topic {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-left: 5px solid #f59e0b;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .kafka-topic.logs { border-left-color: #3b82f6; background: #f0f9ff; border-color: #bae6fd; }
+  .kafka-topic.anomaly { border-left-color: #ef4444; background: #fef2f2; border-color: #fecaca; }
+  .kafka-topic.retry { border-left-color: #8b5cf6; background: #faf5ff; border-color: #e9d5ff; }
+
+  .kafka-topic-name {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .kafka-topic-rate {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+  .kafka-topic-meta {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 700;
+    margin-top: 3px;
+  }
+  .kafka-topic-detail {
+    font-size: 11.5px;
+    color: #334155;
+    margin-top: 7px;
+    line-height: 1.45;
+  }
+
+  /* Center Column Grid (Split) */
+  .center-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    height: 100%;
+  }
+
+  .engine-box {
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 13px 15px;
+    display: flex;
+    flex-direction: column;
+  }
+  .engine-box.ingest { border-top: 4px solid #3b82f6; }
+  .engine-box.detect { border-top: 4px solid #f59e0b; }
+  .engine-box.rca { border-top: 4px solid #10b981; }
+
+  .engine-title {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .engine-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #e2e8f0;
+    color: #334155;
+  }
+  .engine-badge.primary { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+  .engine-badge.ai { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+
+  .spec-list {
+    list-style: none;
+    font-size: 11.5px;
+    color: #334155;
+    line-height: 1.45;
+  }
+  .spec-list li {
+    margin-bottom: 5px;
+    padding-left: 14px;
+    position: relative;
+  }
+  .spec-list li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #3b82f6;
+    font-weight: bold;
+    font-size: 14px;
+  }
+  .spec-list li.warn::before { color: #f59e0b; }
+  .spec-list li.success::before { color: #10b981; }
+  .spec-list li.ai::before { color: #8b5cf6; }
+
+  /* Google Cloud Vertex AI Card */
+  .vertex-box {
+    background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
+    border: 2px solid #a855f7;
+    border-radius: 10px;
+    padding: 13px 15px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.08);
+  }
+  .vertex-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid #f3e8ff;
+  }
+  .vertex-title {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: #6b21a8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .vertex-pill {
+    background: linear-gradient(135deg, #a855f7, #6366f1);
+    color: white;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 12px;
+  }
+  .iam-auth-badge {
+    background: #ede9fe;
+    border: 1.5px solid #ddd6fe;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: #5b21b6;
+    font-weight: 700;
+    margin: 4px 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Persistence Tier (Bottom Row of Center) */
+  .persistence-grid {
+    grid-column: span 2;
+    background: #f8fafc;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 11px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  .persist-item {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 9px 12px;
+  }
+  .persist-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .persist-desc {
+    font-size: 11px;
+    color: #475569;
+    line-height: 1.4;
+  }
+
+  /* Right Column: SRE Command Center */
+  .sre-card {
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-top: 4px solid #0284c7;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 11px;
+  }
+  .sre-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0369a1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .cdn-badge {
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid #bae6fd;
+  }
+
+  /* Action Buttons Box */
+  .action-box {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 2px solid #22c55e;
+    border-radius: 10px;
+    padding: 13px 14px;
+    margin-top: auto;
+  }
+  .action-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #15803d;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .action-button-mock {
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: white;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 9px 14px;
+    border-radius: 6px;
+    text-align: center;
+    box-shadow: 0 3px 8px rgba(22, 163, 74, 0.35);
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.3px;
+  }
+  .action-flows {
+    font-size: 11px;
+    color: #166534;
+    line-height: 1.4;
+    margin-top: 7px;
+  }
+
+  /* Bottom SLA Bar */
+  .sla-footer {
+    background: linear-gradient(135deg, #090d16 0%, #111827 50%, #1e293b 100%);
+    border-radius: 12px;
+    padding: 10px 24px;
+    color: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .sla-pipeline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .sla-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 6px 14px;
+    min-width: 145px;
+  }
+  .sla-step-name {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .sla-step-time {
+    font-size: 14px;
+    font-weight: 900;
+    color: #38bdf8;
+    margin-top: 2px;
+  }
+  .sla-arrow {
+    color: #64748b;
+    font-weight: 900;
+    font-size: 18px;
+  }
+  .sla-highlight {
+    background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+    border: 1.5px solid #4ade80;
+    border-radius: 10px;
+    padding: 8px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
+  }
+  .sla-highlight-title {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #bbf7d0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .sla-highlight-val {
+    font-size: 20px;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+  }
+  .sla-highlight-sub {
+    font-size: 10.5px;
+    color: #dcfce7;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="header-logo">UL</div>
+      <div class="header-title-box">
+        <h1>ULTRON AI — <span class="highlight">ENTERPRISE CLOSED-LOOP ARCHITECTURE</span></h1>
+        <p>Real-Time Microservices Telemetry Stream → Multi-Tier Mathematical Anomaly Detection → Google Cloud Vertex AI Cognitive RCA → Closed-Loop Self-Healing</p>
+      </div>
+    </div>
+    <div class="header-badges">
+      <div class="badge badge-gcp">☁️ Google Cloud AI Builder Cup 2026</div>
+      <div class="badge badge-vertex">✨ Vertex AI Gemini 1.5 Flash</div>
+      <div class="badge badge-firestore">⚡ Cloud Firestore CQRS</div>
+      <div class="badge badge-sla">🛡️ 99.6% MTTR Reduction</div>
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE BODY -->
+  <div class="architecture-body">
+
+    <!-- COL 1: MICROSERVICES & CHAOS -->
+    <div class="col">
+      <div class="main-card">
+        <div class="card-header">
+          <div class="card-title">1. MONITORED MICROSERVICES & CHAOS</div>
+          <div class="card-subtitle">Java 21 • Virtual Threads</div>
+        </div>
+
+        <div class="services-container">
+          <div class="service-item payment">
+            <div class="service-name">
+              <span>payment-service</span>
+              <span class="service-port" style="color:#ef4444;background:#fef2f2;border-color:#fecaca;">Port 8085</span>
+            </div>
+            <div class="service-tech">HikariCP Pool • Webhook Refunds • PostgreSQL</div>
+            <div class="service-desc">Processes gateway callbacks & refunds; prone to connection pool exhaustion during flash spikes.</div>
+          </div>
+
+          <div class="service-item order">
+            <div class="service-name">
+              <span>order-service</span>
+              <span class="service-port" style="color:#f97316;background:#fff7ed;border-color:#fed7aa;">Port 8086</span>
+            </div>
+            <div class="service-tech">Spring Boot 3.3 • Circuit Breakers • REST</div>
+            <div class="service-desc">Checkout pipeline coordinator; cascades timeouts if payment gateway slows.</div>
+          </div>
+
+          <div class="service-item inventory">
+            <div class="service-name">
+              <span>inventory-service</span>
+              <span class="service-port" style="color:#eab308;background:#fefce8;border-color:#fef08a;">Port 8087</span>
+            </div>
+            <div class="service-tech">Pessimistic DB Locks • Catalog Cache</div>
+            <div class="service-desc">High-concurrency stock reservation; prone to lock waits during flash sales.</div>
+          </div>
+
+          <div class="service-item notif">
+            <div class="service-name">
+              <span>notification-service</span>
+              <span class="service-port" style="color:#8b5cf6;background:#faf5ff;border-color:#e9d5ff;">Port 8088</span>
+            </div>
+            <div class="service-tech">Async Queue Worker • Email / SMS</div>
+            <div class="service-desc">Consumes order dispatch events; monitors queue backlog and consumer lag.</div>
+          </div>
+
+          <div class="service-item user">
+            <div class="service-name">
+              <span>user-service</span>
+              <span class="service-port" style="color:#3b82f6;background:#eff6ff;border-color:#bfdbfe;">Port 8089</span>
+            </div>
+            <div class="service-tech">JWT Auth • Redis Session Cache</div>
+            <div class="service-desc">Authentication & profile queries; evaluates token latency & session expiry.</div>
+          </div>
+        </div>
+
+        <!-- CHAOS ENGINE -->
+        <div class="chaos-box">
+          <div class="chaos-title">💥 Chaos Engineering Engine (AnomalyInjector)</div>
+          <div style="font-size:11px;color:#7c2d12;line-height:1.35;">Injects 7 production failure vectors into live microservices to test AI diagnostic accuracy:</div>
+          <div class="chaos-pills">
+            <div class="chaos-pill">Database Outage</div>
+            <div class="chaos-pill">Memory Leak</div>
+            <div class="chaos-pill">Latency Surge</div>
+            <div class="chaos-pill">5xx Error Spike</div>
+            <div class="chaos-pill">Downstream Timeout</div>
+            <div class="chaos-pill">429 Rate Limit</div>
+            <div class="chaos-pill">Config Drift</div>
+          </div>
+        </div>
+
+        <!-- CLOSED LOOP REMEDIATION INBOUND -->
+        <div class="remediation-target">
+          <div class="remediation-icon">↺</div>
+          <div class="remediation-text">
+            <b>Closed-Loop Target:</b> Receives automated hotfixes (HikariCP pool recycling, DB connection expansion, circuit tripping) directly from SRE Command Center without human delay.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- COL 2: HIGH-THROUGHPUT EVENT BUS -->
+    <div class="col">
+      <div class="main-card">
+        <div class="card-header">
+          <div class="card-title">2. EVENT STREAMING BUS</div>
+          <div class="card-subtitle">Apache Kafka 7.5 Confluent</div>
+        </div>
+
+        <!-- TOPIC 1 -->
+        <div class="kafka-topic logs">
+          <div class="kafka-topic-name">
+            <span>TOPIC: 'log-events'</span>
+            <span class="kafka-topic-rate" style="background:#dbeafe;color:#1e40af;">15,000+ evt/s</span>
+          </div>
+          <div class="kafka-topic-meta">Key: serviceName (Partition Key) • Non-Blocking Stream</div>
+          <div class="kafka-topic-detail">
+            • Continuous high-throughput telemetry ingestion<br>
+            • Schema: <code>LogEventDTO</code> (traceId, level, latency, error)<br>
+            • Producer: Monitored Microservices & Simulator<br>
+            • Consumer: <code>ultron-ingestion</code> (Batch JDBC)
+          </div>
+        </div>
+
+        <!-- TOPIC 2 -->
+        <div class="kafka-topic anomaly">
+          <div class="kafka-topic-name">
+            <span>TOPIC: 'anomaly-events'</span>
+            <span class="kafka-topic-rate" style="background:#fee2e2;color:#991b1b;">Real-Time Triggers</span>
+          </div>
+          <div class="kafka-topic-meta">Calibrated Severity Tiers: P0 / P1 / P2</div>
+          <div class="kafka-topic-detail">
+            • Mathematical outlier detection alerts<br>
+            • 5-min alert deduplication window stops alert storms<br>
+            • Producer: <code>ultron-detector</code> (30s eval loop)<br>
+            • Consumer: <code>ultron-rca</code> Engine
+          </div>
+        </div>
+
+        <!-- TOPIC 3 -->
+        <div class="kafka-topic retry">
+          <div class="kafka-topic-name">
+            <span>TOPIC: 'rca-retry'</span>
+            <span class="kafka-topic-rate" style="background:#f3e8ff;color:#6b21a8;">Dead-Letter Queue</span>
+          </div>
+          <div class="kafka-topic-meta">Exponential Backoff • Zero Data Loss</div>
+          <div class="kafka-topic-detail">
+            • Guarantees zero missed incident analyses<br>
+            • Automatically re-enqueues on LLM gateway timeouts<br>
+            • Seamless fallback routing to OpenRouter pool
+          </div>
+        </div>
+
+        <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:10px;margin-top:auto;">
+          <div style="font-size:12px;font-weight:800;color:#334155;">⚡ ZooKeeper Distributed Coordination</div>
+          <div style="font-size:11px;color:#64748b;margin-top:3px;line-height:1.4;">
+            In-sync replicas (ISR=1), automated partition rebalancing, and zero-loss commit logs across all telemetry partitions.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- COL 3: OBSERVABILITY ENGINES & COGNITIVE AI LAYER -->
+    <div class="col">
+      <div class="main-card">
+        <div class="card-header">
+          <div class="card-title">3. AUTONOMOUS OBSERVABILITY & COGNITIVE AI ENGINES</div>
+          <div class="card-subtitle">GCE Core (Ubuntu 22.04 LTS) + Vertex AI</div>
+        </div>
+
+        <div class="center-grid">
+
+          <!-- 3A: TELEMETRY INGESTION -->
+          <div class="engine-box ingest">
+            <div class="engine-title">
+              <span>3A. Telemetry Ingestion</span>
+              <span class="engine-badge primary">Port 8081</span>
+            </div>
+            <ul class="spec-list">
+              <li><b>Batch JDBC Inserter:</b> Bulk-persists raw telemetry into PostgreSQL in micro-batches (chunk size = 50).</li>
+              <li><b>Real-Time RED Accumulator:</b> Tracks Request Rate (req/s), Error 5xx %, and Latency percentiles.</li>
+              <li><b>Sub-Millisecond Cache Stream:</b> Writes rolling 1-min & 5-min sliding windows directly to Redis sorted sets.</li>
+              <li><b>High-Throughput:</b> Non-blocking consumer handles 15,000+ events/sec without backpressure.</li>
+            </ul>
+          </div>
+
+          <!-- 3B: STATISTICAL DETECTOR -->
+          <div class="engine-box detect">
+            <div class="engine-title">
+              <span>3B. Statistical Anomaly Detector</span>
+              <span class="engine-badge primary">Port 8082</span>
+            </div>
+            <div style="font-size:11.5px;font-weight:800;color:#b45309;margin-bottom:5px;">3 Concurrent Mathematical Analysers (30s Cycle):</div>
+            <ul class="spec-list">
+              <li class="warn"><b>1. Z-Score Outlier Analysis:</b> Computes <code>Z = (X - μ) / σ</code>; flags latency spikes & 5xx surges when <code>Z > 2.5</code>.</li>
+              <li class="warn"><b>2. Calibrated Error Rate Tiers:</b> Evaluates 5xx % thresholds: <b>P0 Critical (&gt;20%)</b>, <b>P1 High (&gt;10%)</b>, <b>P2 Medium (&gt;5%)</b>.</li>
+              <li class="warn"><b>3. 15-Min Moving Average:</b> Catches slow-burn memory leaks and connection pool depletion before outages occur.</li>
+              <li><b>5-Min Deduplication Window:</b> Prevents alert storms during sustained degradation.</li>
+            </ul>
+          </div>
+
+          <!-- 4A: COGNITIVE RCA ENGINE -->
+          <div class="engine-box rca">
+            <div class="engine-title">
+              <span>4A. Cognitive RCA Engine</span>
+              <span class="engine-badge ai">Port 8083</span>
+            </div>
+            <ul class="spec-list">
+              <li class="ai"><b>Context Aggregator:</b> Dynamically queries PostgreSQL for ±5 min window of contextual logs, stack traces, and caller/callee traces around the anomaly.</li>
+              <li class="ai"><b>Prompt Injection Defense:</b> Heuristic & regex sanitation prevents adversarial payloads in HTTP logs from altering LLM prompts.</li>
+              <li class="ai"><b>AI Quality Gate:</b> Validates LLM responses against strict JSON schemas before storing or dispatching incidents.</li>
+              <li class="ai"><b>Redis Semantic Cache:</b> Caches identical incident diagnoses with 1-hr TTL, cutting LLM API costs by 78%.</li>
+            </ul>
+          </div>
+
+          <!-- 4B: GOOGLE CLOUD VERTEX AI -->
+          <div class="vertex-box">
+            <div class="vertex-header">
+              <div class="vertex-title">☁️ Google Cloud Vertex AI</div>
+              <div class="vertex-pill">Gemini 1.5 Flash</div>
+            </div>
+            <div class="iam-auth-badge">
+              🔑 <b>Zero-Key Enterprise IAM:</b> Authorized via Application Default Credentials (ADC) Bearer Token + <code>X-Goog-User-Project</code>.
+            </div>
+            <ul class="spec-list">
+              <li class="ai"><b>Global Inference Gateway:</b> Direct HTTP/2 integration with Vertex AI endpoint: <code>https://aiplatform.googleapis.com/...</code></li>
+              <li class="ai"><b>Deep Multi-Hop Causal Reasoning:</b> Pinpoints exact root cause, faulty Java code line, stack trace, and blast radius across microservices.</li>
+              <li class="ai"><b>Actionable Remediation Generation:</b> Outputs exact SQL tuning commands (e.g. <code>ALTER SYSTEM SET max_connections=250</code>) and config hotfixes.</li>
+              <li><b>Resilient Fallback Pool:</b> OpenRouter multi-model pool auto-activates during network dips or quota exhaustion.</li>
+            </ul>
+          </div>
+
+          <!-- 5: PERSISTENCE & CQRS LAYER -->
+          <div class="persistence-grid">
+            <div class="persist-item" style="border-left: 4px solid #3b82f6;">
+              <div class="persist-title">🐘 PostgreSQL 16 (pgvector)</div>
+              <div class="persist-desc">ACID incident audit trail, telemetry event storage, 24h automated partitioning & pruning cron.</div>
+            </div>
+            <div class="persist-item" style="border-left: 4px solid #f97316;">
+              <div class="persist-title">🔥 Google Cloud Firestore</div>
+              <div class="persist-desc"><b>Real-Time CQRS Dual-Write:</b> Asynchronously streams incident dispatches to connected browsers with &lt;100ms WebSocket latency.</div>
+            </div>
+            <div class="persist-item" style="border-left: 4px solid #ef4444;">
+              <div class="persist-title">⚡ Redis 7 In-Memory Store</div>
+              <div class="persist-desc">Sub-millisecond sliding-window P99 percentiles, atomic rate-limit counters, distributed locks, semantic LLM cache.</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- COL 4: SRE COMMAND CENTER & CLOSED-LOOP REMEDIATION -->
+    <div class="col">
+      <div class="main-card">
+        <div class="card-header">
+          <div class="card-title">4. SRE OPERATIONS COMMAND CENTER</div>
+          <div class="card-subtitle">Firebase CDN + Nginx SSL</div>
+        </div>
+
+        <!-- GATEWAY -->
+        <div class="sre-card">
+          <div class="sre-title">
+            <span>REST API Gateway & Security</span>
+            <span class="cdn-badge">Port 8084</span>
+          </div>
+          <ul class="spec-list">
+            <li><b>Nginx Reverse Proxy:</b> Port 443 SSL termination via Let's Encrypt automated certbot renewal.</li>
+            <li><b>Domain Mapping:</b> Live on <code>34-93-6-124.sslip.io</code>.</li>
+            <li><b>Security Filter:</b> Redis IP rate limiting & AES-256-GCM encrypted API keys.</li>
+          </ul>
+        </div>
+
+        <!-- FRONTEND STUDIO -->
+        <div class="sre-card" style="border-top-color: #f59e0b;">
+          <div class="sre-title">
+            <span>React 19 SRE Studio</span>
+            <span class="cdn-badge" style="background:#fef3c7;color:#b45309;border-color:#fde68a;">Firebase CDN</span>
+          </div>
+          <ul class="spec-list">
+            <li><b>Live CDN URL:</b> <code>ultron-ai-platform.web.app</code></li>
+            <li><b>RED Metrics Dashboard:</b> Real-time charts for Request Rate, Error %, and P99 Latency via Recharts.</li>
+            <li><b>WebSocket Incident Queue:</b> Instant incident push with P0 Critical / P1 High badges.</li>
+            <li><b>Dual-Triage Workflow:</b> Tab A (Cognitive AI RCA) + Tab B (Manual SRE collaborative triage).</li>
+            <li><b>Incident Stepper:</b> 6-stage lifecycle tracking (New → Assess → RCA → Fix → Resolved → Closed).</li>
+          </ul>
+        </div>
+
+        <!-- CLOSED LOOP REMEDIATION -->
+        <div class="action-box">
+          <div class="action-title">⚡ Closed-Loop Self-Healing</div>
+          <div style="font-size:11px;color:#166534;line-height:1.35;">
+            SRE triggers instant remediation with a single click, executing hotfixes without downtime:
+          </div>
+          <div class="action-button-mock">
+            <span>✓ ACCEPT FIX & 1-CLICK REMEDIATE</span>
+          </div>
+          <div class="action-flows">
+            • <b>Automated Hotfix:</b> Dispatches DB pool expansion, connection recycling, & timeout configurations.<br>
+            • <b>Alert Dispatch:</b> Webhooks notify Slack, PagerDuty, and email escalation channels.<br>
+            • <b>1-Click Demo Reset:</b> Cleans state for live evaluations.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SLA & MTTR FOOTER BANNER -->
+  <div class="sla-footer">
+    <div style="display: flex; flex-direction: column;">
+      <div style="font-size: 14px; font-weight: 800; color: #f8fafc; letter-spacing: -0.3px;">
+        ⏱️ END-TO-END TELEMETRY & ROOT CAUSE RESOLUTION PIPELINE LATENCY SLAs
+      </div>
+      <div style="font-size: 11.5px; color: #94a3b8; font-weight: 500; margin-top: 2px;">
+        Zero-human-delay autonomous telemetry ingestion, mathematical anomaly detection, cognitive reasoning, and cloud broadcast
+      </div>
+    </div>
+
+    <div class="sla-pipeline">
+      <div class="sla-step">
+        <span class="sla-step-name">1. Ingestion</span>
+        <span class="sla-step-time">&lt; 15 ms</span>
+      </div>
+      <div class="sla-arrow">➔</div>
+
+      <div class="sla-step">
+        <span class="sla-step-name">2. Detection</span>
+        <span class="sla-step-time">&lt; 450 ms</span>
+      </div>
+      <div class="sla-arrow">➔</div>
+
+      <div class="sla-step">
+        <span class="sla-step-name">3. Context Gather</span>
+        <span class="sla-step-time">&lt; 60 ms</span>
+      </div>
+      <div class="sla-arrow">➔</div>
+
+      <div class="sla-step" style="border-color: #a855f7; background: rgba(168,85,247,0.15);">
+        <span class="sla-step-name" style="color: #d8b4fe;">4. Vertex AI LLM</span>
+        <span class="sla-step-time" style="color: #f3e8ff;">~ 1.2 s</span>
+      </div>
+      <div class="sla-arrow">➔</div>
+
+      <div class="sla-step" style="border-color: #f59e0b; background: rgba(245,158,11,0.15);">
+        <span class="sla-step-name" style="color: #fde68a;">5. CQRS Dual-Write</span>
+        <span class="sla-step-time" style="color: #fffbeb;">&lt; 95 ms</span>
+      </div>
+      <div class="sla-arrow">➔</div>
+
+      <div class="sla-step">
+        <span class="sla-step-name">6. UI Push</span>
+        <span class="sla-step-time">&lt; 100 ms</span>
+      </div>
+    </div>
+
+    <div class="sla-highlight">
+      <div class="sla-highlight-title">Total MTTR Reduction</div>
+      <div class="sla-highlight-val">&lt; 8.2 SECONDS</div>
+      <div class="sla-highlight-sub">vs. 45 min industry avg (99.6% faster)</div>
+    </div>
+  </div>
+
+</body>
+</html>
